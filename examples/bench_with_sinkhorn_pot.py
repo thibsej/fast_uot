@@ -4,8 +4,15 @@ from scipy.special import logsumexp
 import cvxpy as cp
 import time as time
 import os
+import torch
 
 from fastuot.uot1d import rescale_potentials, solve_ot
+from fastuot.numpy_sinkhorn import sinkhorn_loop, \
+    fast_homogeneous_loop
+from fastuot.numpy_sinkhorn import homogeneous_loop as numpy_loop
+from fastuot.torch_sinkhorn import homogeneous_loop as torch_loop
+
+assert torch.cuda.is_available()
 
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
@@ -24,106 +31,37 @@ def dual_via_cvxpy(a, b, x, y, p, rho):
     constr = [f[:, None] + g[None, :] <= C]
     objective = cp.Minimize(inta + intb)
     prob = cp.Problem(objective, constr)
-    result = prob.solve(max_iters=50000, verbose=False,
+    result = prob.solve(max_iters=500000, verbose=False,
                         solver=cp.SCS, eps=1e-7)
     # result = prob.solve(max_iters=30000, verbose=False,
     #                     solver=cp.ECOS, abstol=1e-7)
     return result, constr, f, g
 
 
-def sinkx(C, f, a, eps):
-    return - eps * logsumexp(np.log(a)[:, None] + (f[:, None] - C) / eps,
-                             axis=0)
-
-
-def sinky(C, g, b, eps):
-    return - eps * logsumexp(np.log(b)[None, :] + (g[None, :] - C) / eps,
-                             axis=1)
-
-
-def aprox(f, eps, rho):
-    return (1. / (1. + (eps / rho))) * f
-
-
-def dual_score_ent(f, g, a, b, C, eps, rho, rho2=None):
-    if rho2 is None:
-        rho2 = rho
-
-    def phi(x, s):
-        return -s * (np.exp(-x / s) - 1)
-
-    return np.sum(a * phi(f, rho)) + np.sum(b * phi(g, rho2)) + np.sum(
-        a[:, None] * b[None, :] * phi(C - f[:, None] - g[None, :], eps))
-
-
-def sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
-    if rho2 is None:
-        rho2 = rho
-    # Update on G
-    g = sinkx(C, f, a, eps)
-    g = aprox(g, eps, rho2)
-    # Update on F
-    f = sinky(C, g, b, eps)
-    f = aprox(f, eps, rho)
-    return f, g
-
-
-def homogeneous_loop(f, a, b, C, eps, rho, rho2=None):
-    if rho2 is None:
-        rho2 = rho
-    # Update on G
-    g = sinkx(C, f, a, eps)
-    g = aprox(g, eps, rho2)
-    t = rescale_potentials(f, g, a, b, rho, rho2)
-    g = g - t
-
-    # Update on F
-    f = sinky(C, g, b, eps)
-    f = aprox(f, eps, rho)
-    t = rescale_potentials(f, g, a, b, rho, rho2)
-    f = f + t
-
-    return f, g
-
-
-def rescale_exp(u, v, a, b, rho, eps):
-    A = np.sum(a * u ** (-rho / eps))
-    B = np.sum(b * v ** (-rho / eps))
-    t = (A / B) ** (0.5 * rho / eps)
-    return t
-
-
-def fast_homogeneous_loop(u, a, b, K, eps, rho):
-    # Update on G
-    v = 1. / K.T.dot(u * a)
-    v = v ** (rho / (rho + eps))
-    t = rescale_exp(u, v, a, b, rho, eps)
-    v = v / t
-
-    # Update on F
-    u = 1. / K.dot(v * b)
-    u = u ** (rho / (rho + eps))
-    t = rescale_exp(u, v, a, b, rho, eps)
-    u = u * t
-
-    return u, v
-
-
 if __name__ == '__main__':
-    Ntrials = 20
-    rho = 10.
+    Ntrials = 1
+    rho = .1
     p = 2.
     nits = 5000
     nbeg = 0
-    N, M = 50, 51
-    list_eps_lse = [-2., -2.5, -3., -3.5, -4.]
+    N, M = 200, 210
+
     acc_fw = np.zeros((Ntrials, nits))
-    acc_lse = np.zeros((len(list_eps_lse), Ntrials, nits))
     time_fw = np.zeros((Ntrials, nits))
+
+    list_eps_lse = [-2., -2.5, -3., -3.5]
+    acc_lse = np.zeros((len(list_eps_lse), Ntrials, nits))
     time_lse = np.zeros((len(list_eps_lse), Ntrials, nits))
-    # list_eps_exp = [1e-1]
-    # acc_exp = np.zeros((len(list_eps_exp), Ntrials, nits))
-    # time_exp = np.zeros((len(list_eps_exp), Ntrials, nits))
+
+    list_eps_gpu = [-2., -2.5, -3., -3.5]
+    acc_gpu = np.zeros((len(list_eps_lse), Ntrials, nits))
+    time_gpu = np.zeros((len(list_eps_lse), Ntrials, nits))
+
+    list_eps_exp = [-0.]
+    acc_exp = np.zeros((len(list_eps_exp), Ntrials, nits))
+    time_exp = np.zeros((len(list_eps_exp), Ntrials, nits))
+
+    cmap = plt.get_cmap('autumn')
 
     for i in range(Ntrials):
         print(f"Trial {i}")
@@ -138,7 +76,9 @@ if __name__ == '__main__':
         fr = f.value
         print("Computed reference potential")
 
+        #######################################################################
         # Bench FW-UOT
+        #######################################################################
         f, g = np.zeros_like(a), np.zeros_like(b)
         dual_val = []
         for k in range(nits):
@@ -153,45 +93,89 @@ if __name__ == '__main__':
             gamma = 2. / (2. + k)  # fixed decaying weights
             f = (1 - gamma) * f + gamma * fs
             g = (1 - gamma) * g + gamma * gs
-            acc_fw[i, k] = np.log10(np.amax(np.abs(f - fr)))
             time_fw[i, k] = time.time() - t0
+            acc_fw[i, k] = np.log10(np.sum(a * np.abs(f - fr)))
+            # acc_fw[i, k] = np.log10(np.amax(np.abs(f - fr)))
+        plt.plot(np.mean(time_fw[:, :]) * np.arange(nits),
+                 np.mean(acc_fw, axis=0), c='b', label='fw')
 
-        # Bench LSE Sinkhorn with translation
+        #######################################################################
+        # Bench Sinkhorn CPU
+        #######################################################################
         for j in range(len(list_eps_lse)):
             eps = 10 ** list_eps_lse[j]
             f, g = np.zeros_like(a), np.zeros_like(b)
             dual_val = []
             for k in range(nits):
                 t0 = time.time()
-                f, g = homogeneous_loop(f, a, b, C, eps, rho, rho2=None)
+                f, g = numpy_loop(f, a, b, C, eps, rho, rho2=None)
                 time_lse[j, i, k] = time.time() - t0
-                acc_lse[j, i, k] = np.log10(np.amax(np.abs(f - fr)))
+                # acc_lse[j, i, k] = np.log10(np.amax(np.abs(f - fr)))
+                acc_lse[j, i, k] = np.log10(np.sum(a * np.abs(f - fr)))
 
             fpt, _ = sinkhorn_loop(f, a, b, C, eps, rho, rho2=None)
             print(np.amax(np.abs(f - fpt)))
 
-        # for j in range(len(list_eps_exp)):
-        #     eps = list_eps_exp[j]
-        #     K = np.exp(-C / eps)
-        #     u, v = np.ones_like(a), np.ones_like(b)
-        #     dual_val = []
-        #     for k in range(nits):
-        #         t0 = time.time()
-        #         u, v = fast_homogeneous_loop(u, a, b, K, eps, rho)
-        #         time_exp[j, i, k] = time.time() - t0
-        #         f = eps * np.log(u)
-        #         acc_exp[j, i, k] = np.log10(np.amax(np.abs(f - fr)))
-
-    plt.plot(np.mean(time_fw[:, :]) * np.arange(nits),
-                 np.mean(acc_fw, axis=0), c='b', label='fw')
-    cmap = plt.get_cmap('autumn')
-    for j in range(len(list_eps_lse)):
-        k = list_eps_lse[j]
-        eps = 10 ** k
-        plt.plot(np.mean(time_lse[j, :, :]) * np.arange(nits),
+        for j in range(len(list_eps_lse)):
+            k = list_eps_lse[j]
+            eps = 10 ** k
+            plt.plot(np.mean(time_lse[j, :, :]) * np.arange(nits),
                      np.mean(acc_lse[j, :, :], axis=0),
-                     label=f'S+T {k}',
-                     c=cmap(j / len(list_eps_lse)))
+                     label=f'Log-CPU ({k})',
+                     c=cmap(j / (len(list_eps_lse) + len(list_eps_exp))))
+
+        for j in range(len(list_eps_exp)):
+            k = list_eps_exp[j]
+            eps = 10 ** k
+            K = np.exp(-C / eps)
+            u, v = np.ones_like(a), np.ones_like(b)
+            dual_val = []
+            for k in range(nits):
+                t0 = time.time()
+                u, v = fast_homogeneous_loop(u, a, b, K, eps, rho)
+                time_exp[j, i, k] = time.time() - t0
+                f = eps * np.log(u)
+                # acc_exp[j, i, k] = np.log10(np.amax(np.abs(f - fr)))
+                acc_exp[j, i, k] = np.log10(np.sum(a * np.abs(f - fr)))
+
+        for j in range(len(list_eps_exp)):
+            k = list_eps_exp[j]
+            eps = 10 ** k
+            plt.plot(np.mean(time_exp[j, :, :]) * np.arange(nits),
+                     np.mean(acc_exp[j, :, :], axis=0),
+                     label=f'Exp-CPU ({k})',
+                     c=cmap((j + len(list_eps_lse)) / (len(list_eps_lse) + len(list_eps_exp))))
+
+        #######################################################################
+        # Bench Sinkhorn GPU
+        #######################################################################
+        at = torch.from_numpy(a).cuda()
+        bt = torch.from_numpy(b).cuda()
+        Ct = torch.from_numpy(C).cuda()
+        frt = torch.from_numpy(fr).cuda()
+        for j in range(len(list_eps_gpu)):
+            eps = 10 ** list_eps_gpu[j]
+            ft, gt = torch.zeros_like(at), torch.zeros_like(bt)
+            dual_val = []
+            for k in range(nits):
+                t0 = time.time()
+                ft, gt = torch_loop(ft, at, bt, Ct, eps, rho, rho2=None)
+                time_gpu[j, i, k] = time.time() - t0
+                # acc_lse[j, i, k] = np.log10(np.amax(np.abs(f - fr)))
+                acc_gpu[j, i, k] = ((at * (ft - frt).abs()).sum()).log10().data.item()
+
+
+        for j in range(len(list_eps_lse)):
+            k = list_eps_lse[j]
+            eps = 10 ** k
+            plt.plot(np.mean(time_gpu[j, :, :]) * np.arange(nits),
+                     np.mean(acc_gpu[j, :, :], axis=0),
+                     label=f'Log-GPU ({k})', linestyle='dashed',
+                     c=cmap(j / (len(list_eps_lse) + len(list_eps_exp))))
+
+
+
+
     plt.legend()
     plt.xlabel('time', fontsize=16)
     plt.ylabel('$\log||f_t - f_*||_\infty$', fontsize=16)
