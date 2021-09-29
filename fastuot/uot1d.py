@@ -161,9 +161,9 @@ def solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-6,
         f_tmp = f
 
         # Line search - convex update
-        if line_search == 'homogeneous':  # TODO: To debug
+        if line_search == 'homogeneous':
             t = homogeneous_line_search(f, g, fb, gb, a, b, rho1, rho2, nits=5)
-        if line_search == 'newton':  # TODO: To debug
+        if line_search == 'newton':
             t = newton_line_search(f, g, fb, gb, a, b, rho1, rho2, nits=5)
         if line_search == 'default':
             t = 2. / (2. + k)
