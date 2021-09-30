@@ -48,14 +48,15 @@ def test_rescale_potential_increase_score(seed, rho, rho2, mass):
     assert score1 <= score2 + 1e-16
 
 
-@pytest.mark.parametrize('seed', [1, 2, 3, 4, 5, 6, 7])
-def test_lazy_pot_is_feasible(seed):
+@pytest.mark.parametrize('seed,boo', [(a, b) for a in [1, 2, 3, 4, 5, 6, 7]
+                                      for b in [True, False]])
+def test_lazy_pot_is_feasible(seed, boo):
     n = int(15)
     m = int(16)
     np.random.seed(seed)
     x = np.sort(np.random.uniform(size=n))
     y = np.sort(np.random.uniform(size=m))
-    f, g = lazy_potential(x, y, p)
+    f, g = lazy_potential(x, y, p, diagonal=boo)
     T = np.abs(x[:, None] - y[None, :]) ** p + 1e-15 > (
             f[:, None] + g[None, :])
     assert np.all(T)
@@ -156,7 +157,7 @@ def test_newton_linesearch_decrease(seed, rho, rho2, mass):
     _, _, _, fb, gb, _ = solve_ot(a / np.sum(a), b / np.sum(b), x, y, p)
     fc, gc = lazy_potential(x, y, p)
     t = newton_line_search(fb, gb, fc - fb, gc - gb, a, b, rho, rho2,
-                                nits=3)
+                           nits=3)
     ft, gt = fb + t * (fc - fb), gb + t * (gc - gb)
     s0 = invariant_dual_loss(fb, gb, a, b, rho, rho2)
     s1 = invariant_dual_loss(fc, gc, a, b, rho, rho2)
