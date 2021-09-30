@@ -6,7 +6,7 @@ import cvxpy as cp
 from scipy.sparse import csr_matrix
 
 from fastuot.uot1d import solve_ot, rescale_potentials, solve_uot, \
-    dual_loss, invariant_dual_loss, homogeneous_line_search
+    dual_loss, invariant_dual_loss, homogeneous_line_search, newton_line_search
 
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     # generate data
     n = int(15)
     m = int(16)
-    np.random.seed(0)
+    # np.random.seed(0)
     normalize = lambda p: p / np.sum(p)
     a = normalize(np.random.uniform(size=n))
     b = normalize(np.random.uniform(size=m))
@@ -66,7 +66,9 @@ if __name__ == '__main__':
     plt.title('CVXPY')
     plt.show()
 
+    ###########################################################################
     # Vanilla FW
+    ###########################################################################
     f, g = np.zeros_like(a), np.zeros_like(b)
     dual_fw, norm_fw = [], []
     for k in range(niter):
@@ -79,9 +81,7 @@ if __name__ == '__main__':
 
         # update
         I, J, P, fs, gs, _ = solve_ot(A, B, x, y, p)
-        # gamma = 2. / (2. + k)  # fixed decaying weights
-        gamma = homogeneous_line_search(f, g, fs-f, gs-g, a, b, rho, rho, nits=5)
-        # print(gamma)
+        gamma = 2. / (2. + k)  # fixed decaying weights
         f = f + gamma * (fs - f)
         g = g + gamma * (gs - g)
 
@@ -89,7 +89,58 @@ if __name__ == '__main__':
     plt.title('FW')
     plt.show()
 
+    ###########################################################################
+    # Vanilla FW with dual line search
+    ###########################################################################
+    f, g = np.zeros_like(a), np.zeros_like(b)
+    dual_lfw, norm_lfw = [], []
+    for k in range(niter):
+        transl = rescale_potentials(f, g, a, b, rho, rho)
+        f, g = f + transl, g - transl
+        norm_lfw.append(np.log(np.amax(np.abs(f - fr))))
+        dual_lfw.append(invariant_dual_loss(f, g, a, b, rho))
+        A = np.exp(-f / rho) * a
+        B = np.exp(-g / rho) * b
+
+        # update
+        I, J, P, fs, gs, _ = solve_ot(A, B, x, y, p)
+        gamma = newton_line_search(f, g, fs - f, gs - g, a, b, rho, rho,
+                                        nits=5)
+        print(f"Linesearch at iter {k} = {gamma}")
+        f = f + gamma * (fs - f)
+        g = g + gamma * (gs - g)
+
+    plt.imshow(np.log(C - f[:, None] - g[None, :]))
+    plt.title('Linesearch-FW')
+    plt.show()
+
+    ###########################################################################
+    # Vanilla FW with homogeneous line search
+    ###########################################################################
+    f, g = np.zeros_like(a), np.zeros_like(b)
+    dual_hfw, norm_hfw = [], []
+    for k in range(niter):
+        transl = rescale_potentials(f, g, a, b, rho, rho)
+        f, g = f + transl, g - transl
+        norm_hfw.append(np.log(np.amax(np.abs(f - fr))))
+        dual_hfw.append(invariant_dual_loss(f, g, a, b, rho))
+        A = np.exp(-f / rho) * a
+        B = np.exp(-g / rho) * b
+
+        # update
+        I, J, P, fs, gs, _ = solve_ot(A, B, x, y, p)
+        gamma = homogeneous_line_search(f, g, fs - f, gs - g, a, b, rho, rho,
+                                        nits=5)
+        f = f + gamma * (fs - f)
+        g = g + gamma * (gs - g)
+
+    plt.imshow(np.log(C - f[:, None] - g[None, :]))
+    plt.title('Homogeneous-FW')
+    plt.show()
+
+    ###########################################################################
     # Pairwise FW
+    ###########################################################################
     f, g = np.zeros_like(a), np.zeros_like(b)
     dual_pfw, norm_pfw = [], []
     atoms = [[f, g]]
@@ -115,45 +166,40 @@ if __name__ == '__main__':
                 itop = i
                 score = dscore
                 fa, ga = ft, gt
-        atoms.append([fs, gs])
-        # TODO: check existence of atom in dictionary
+
+        # Check existence of atom in dictionary
+        jtop = -1
+        for i in range(len(atoms)):
+            [ft, gt] = atoms[i]
+            if np.array_equal(ft, fs) and np.array_equal(gt, gs):
+                jtop = i
+                break
+        # print("if index in dictionary", jtop)
+        if jtop == -1:
+            atoms.append([fs, gs])
+            weights.append(0.)
 
         gamma = homogeneous_line_search(f, g, fs-fa, gs-ga, a, b, rho, rho,
                                         nits=5, tmax=weights[itop])
         f = f + gamma * (fs - fa)
         g = g + gamma * (gs - ga)
-        weights.append(gamma)
+        # weights.append(gamma)
+        weights[jtop] = weights[jtop] + gamma
         weights[itop] = weights[itop] - gamma
         if weights[itop] <= 0.:
             atoms.pop(itop)
             weights.pop(itop)
-
-        # gamma = np.minimum(2. / (2. + k), t)
-        # l1 = invariant_dual_loss(f + gamma * (fs - fa), g + gamma * (gs - ga),
-        #                          a, b, rho)
-        # l2 = invariant_dual_loss(f + t * (fs - fa), g + t * (gs - ga), a, b,
-        #                          rho)
-        # if l1 < l2:
-        #     f = f + t * (fs - fa)
-        #     g = g + t * (gs - ga)
-        #     weights.append(t)
-        #     atoms.pop(itop)
-        #     weights.pop(itop)
-        # else:
-        #     f = f + gamma * (fs - fa)
-        #     g = g + gamma * (gs - ga)
-        #     weights.append(gamma)
-        #     weights[itop] = weights[itop] - gamma
-        #     if weights[itop] <= 0.:
-        #         atoms.pop(itop)
-        #         weights.pop(itop)
-        print(f"Weights at time {k}", len(weights), len(set(weights)))
+        # print(f"Weights at time {k}", len(weights), len(set(weights)))
     plt.imshow(np.log(C - f[:, None] - g[None, :]))
     plt.title('PFW')
     plt.show()
 
-    # Plot results
+    ###########################################################################
+    # Plot dual loss and norm
+    ###########################################################################
     plt.plot(dual_fw, label='FW')
+    plt.plot(dual_lfw, label='LFW')
+    plt.plot(dual_hfw, label='HFW')
     plt.plot(dual_pfw, label='PFW')
     plt.legend()
     plt.title('DUAL')
@@ -161,6 +207,8 @@ if __name__ == '__main__':
 
     # Plot results
     plt.plot(norm_fw, label='FW')
+    plt.plot(norm_lfw, label='LFW')
+    plt.plot(norm_hfw, label='HFW')
     plt.plot(norm_pfw, label='PFW')
     plt.legend()
     plt.title('NORM')
