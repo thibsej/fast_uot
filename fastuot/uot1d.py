@@ -140,7 +140,16 @@ def invariant_dual_loss(f, g, a, b, rho1, rho2=None):
     return loss
 
 
-def solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-6,
+def primal_dual_gap(a, b, x, y, p, f, g, P, I, J, rho1, rho2=None):
+    if rho2 is None:
+        rho2 = rho1
+    prim = np.sum(P * np.abs(x[I] - y[J])**p)
+    dual = np.sum(f * np.exp(-f / rho1) * a) \
+           + np.sum(g * np.exp(-g / rho2) * b)
+    return prim - dual
+
+
+def solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-10,
               greed_init=True, line_search='default', stable_lse=True):
     assert line_search in ['homogeneous', 'newton', 'default']
     if rho2 is None:
@@ -152,38 +161,40 @@ def solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-6,
     else:
         f, g = np.zeros_like(a), np.zeros_like(b)
 
-    # Output FW descent direction
-    transl = rescale_potentials(f, g, a, b, rho1, rho2, stable_lse=stable_lse)
-    f, g = f + transl, g - transl
-    A, B = a * np.exp(-f / rho1), b * np.exp(-g / rho2)
-    I, J, P, fb, gb, cost = solve_ot(A, B, x, y, p)
     for k in range(niter):
-        f_tmp = f
-
-        # Line search - convex update
-        if line_search == 'homogeneous':
-            t = homogeneous_line_search(f, g, fb - f, gb - g, a, b, rho1, rho2,
-                                        nits=5)
-        if line_search == 'newton':
-            t = newton_line_search(f, g, fb - f, gb - g, a, b, rho1, rho2,
-                                   nits=5)
-        if line_search == 'default':
-            t = 2. / (2. + k)
-        f = (1 - t) * f + t * fb
-        g = (1 - t) * g + t * gb
-
-        # Compute next FW direction
+        # Output FW descent direction
         transl = rescale_potentials(f, g, a, b, rho1, rho2,
                                     stable_lse=stable_lse)
         f, g = f + transl, g - transl
         A, B = a * np.exp(-f / rho1), b * np.exp(-g / rho2)
-        I, J, P, fb, gb, cost = solve_ot(A, B, x, y, p)
-        if np.amax(np.abs(f - f_tmp)) < tol:
+        I, J, P, fd, gd, cost = solve_ot(A, B, x, y, p)
+
+        # Line search - convex update
+        if line_search == 'homogeneous':
+            t = homogeneous_line_search(f, g, fd - f, gd - g,
+                                        a, b, rho1, rho2, nits=5)
+        if line_search == 'newton':
+            t = newton_line_search(f, g, fd - f, gd - g,
+                                   a, b, rho1, rho2, nits=5)
+        if line_search == 'default':
+            t = 2. / (2. + k)
+        f = f + t * (fd - f)
+        g = g + t * (gd - g)
+
+        pdg = primal_dual_gap(a, b, x, y, p, f, g, P, I, J, rho1, rho2=None)
+        if pdg < tol:
             break
+
+    # Last iter before output
+    transl = rescale_potentials(f, g, a, b, rho1, rho2,
+                                stable_lse=stable_lse)
+    f, g = f + transl, g - transl
+    A, B = a * np.exp(-f / rho1), b * np.exp(-g / rho2)
+    I, J, P, _, _, cost = solve_ot(A, B, x, y, p)
     return I, J, P, f, g, cost
 
 
-def pairwise_solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100,
+def pairwise_solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-10,
                        greed_init=True, stable_lse=True):
     if rho2 is None:
         rho2 = rho1
@@ -195,35 +206,60 @@ def pairwise_solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100,
         f, g = np.zeros_like(a), np.zeros_like(b)
 
     # Store atoms for pairwise steps
-    atoms = [(f, g)]
+    atoms = [[f, g]]
+    weights = [1.]
 
     for k in range(niter):
-        # Output FW descent direction
-        transl = rescale_potentials(f, g, a, b, rho1, rho2,
-                                    stable_lse=stable_lse)
+        transl = rescale_potentials(f, g, a, b, rho1, rho2)
         f, g = f + transl, g - transl
-        A, B = a * np.exp(-f / rho1), b * np.exp(-g / rho2)
-        I, J, P, fd, gd, cost = solve_ot(A, B, x, y, p)
+        A = np.exp(-f / rho1) * a
+        B = np.exp(-g / rho2) * b
+
+        # update
+        I, J, P, fd, gd, _ = solve_ot(A, B, x, y, p)
 
         # Find best ascent direction
         score = np.inf
-        for (ft, gt) in atoms:
+        itop = 0
+        for i in range(len(atoms)):
+            [ft, gt] = atoms[i]
             dscore = np.sum(A * ft) + np.sum(B * gt)
             if dscore < score:
+                itop = i
                 score = dscore
                 fa, ga = ft, gt
-        atoms.append((fd, gd))
 
-        t = 2. / (2. + k)
-        f = f + t * (fd - fa)
-        g = g + t * (gd - ga)
+        # Check existence of atom in dictionary
+        jtop = -1
+        for i in range(len(atoms)):
+            [ft, gt] = atoms[i]
+            if np.array_equal(ft, fd) and np.array_equal(gt, gd):
+                jtop = i
+                break
+        if jtop == -1:
+            atoms.append([fd, gd])
+            weights.append(0.)
+
+        gamma = homogeneous_line_search(f, g, fd - fa, gd - ga,
+                                        a, b, rho1, rho2,
+                                        nits=5, tmax=weights[itop])
+        f = f + gamma * (fd - fa)
+        g = g + gamma * (gd - ga)
+        weights[jtop] = weights[jtop] + gamma
+        weights[itop] = weights[itop] - gamma
+        if weights[itop] <= 0.:
+            atoms.pop(itop)
+            weights.pop(itop)
+
+        pdg = primal_dual_gap(a, b, x, y, p, f, g, P, I, J, rho1, rho2=None)
+        if pdg < tol:
+            break
 
     # Last iter before output
-    transl = rescale_potentials(f, g, a, b, rho1, rho2,
-                                stable_lse=stable_lse)
+    transl = rescale_potentials(f, g, a, b, rho1, rho2, stable_lse=stable_lse)
     f, g = f + transl, g - transl
     A, B = a * np.exp(-f / rho1), b * np.exp(-g / rho2)
-    I, J, P, fd, gd, cost = solve_ot(A, B, x, y, p)
+    I, J, P, _, _, cost = solve_ot(A, B, x, y, p)
     return I, J, P, f, g, cost
 
 
@@ -236,17 +272,16 @@ def homogeneous_line_search(fin, gin, d_f, d_g, a, b, rho1, rho2, nits,
     ----------
     fin
     gin
-    fout
-    gout
+    d_f
+    d_g
     rho1
     rho2
     nits
+    tmax
 
     Returns
     -------
-
     """
-    # TODO: Recheck formulas
     t = 0.5
     tau1, tau2 = 1. / (1. + (rho2 / rho1)), 1. / (1. + (rho1 / rho2))
     for k in range(nits):
@@ -298,9 +333,9 @@ def newton_line_search(fin, gin, d_f, d_g, a, b, rho1, rho2, nits, tmax=1.):
     return t
 
 
-#######################
+###############################################################################
 # GREEDY INITIALIZATION
-#######################
+###############################################################################
 
 def init_greed_uot(a, b, x, y, p, rho1, rho2=None):
     if rho2 is None:
@@ -317,7 +352,7 @@ def init_greed_uot(a, b, x, y, p, rho1, rho2=None):
     return ft, gt
 
 
-@jit(nopython=True)
+# @jit(nopython=True)
 def lazy_potential(x, y, p):
     """Computes the 1D Optimal Transport between two histograms.
 
@@ -349,18 +384,21 @@ def lazy_potential(x, y, p):
     g = np.zeros(m)
     g[0] = np.abs(x[0] - y[0]) ** p
     for k in range(q - 1):
-        c12 = np.abs(x[i] - y[j + 1]) ** p
-        c21 = np.abs(x[i + 1] - y[j]) ** p
-        if (c12 < c21) and (i < n - 1):
-            i += 1
-            f[i] = c21 - g[j]
-        elif (c12 > c21) and (j < m - 1):
+        if i == n - 1:
             j += 1
             g[j] = c12 - f[i]
-        elif i == n - 1:
-            j += 1
-            g[j] = c12 - f[i]
+            continue
         elif j == m - 1:
             i += 1
             f[i] = c21 - g[j]
+            continue
+
+        c12 = np.abs(x[i] - y[j + 1]) ** p
+        c21 = np.abs(x[i + 1] - y[j]) ** p
+        if (c12 > c21) and (i < n - 1):
+            i += 1
+            f[i] = c21 - g[j]
+        elif (c12 < c21) and (j < m - 1):
+            j += 1
+            g[j] = c12 - f[i]
     return f, g
