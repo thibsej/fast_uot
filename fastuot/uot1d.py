@@ -352,8 +352,8 @@ def init_greed_uot(a, b, x, y, p, rho1, rho2=None):
     return ft, gt
 
 
-# @jit(nopython=True)
-def lazy_potential(x, y, p):
+@jit(nopython=True)
+def lazy_potential2(x, y, p):
     """Computes the 1D Optimal Transport between two histograms.
 
     _Important: one should have np.sum(a)=np.sum(b)._
@@ -384,7 +384,6 @@ def lazy_potential(x, y, p):
     g = np.zeros(m)
     g[0] = np.abs(x[0] - y[0]) ** p
     for k in range(q - 1):
-        T = np.abs(x[:,None] - y[None,:])**p - f[:,None] - g[None,:]
         if i == n - 1:
             j += 1
             c12 = np.abs(x[i] - y[j]) ** p
@@ -398,10 +397,69 @@ def lazy_potential(x, y, p):
 
         c12 = np.abs(x[i] - y[j + 1]) ** p
         c21 = np.abs(x[i + 1] - y[j]) ** p
-        if (c12 > c21) and (i < n - 1):
+        if c12 > c21:
             i += 1
             f[i] = c21 - g[j]
-        elif (c12 < c21) and (j < m - 1):
+        elif c12 < c21:
+            j += 1
+            g[j] = c12 - f[i]
+    return f, g
+
+@jit(nopython=True)
+def lazy_potential(x, y, p, diagonal=True):
+    """Computes the 1D Optimal Transport between two histograms.
+
+    _Important: one should have np.sum(a)=np.sum(b)._
+
+    _Important:_ x and y needs to be sorted.
+
+    Parameters
+    ----------
+    x: vector of real of length n
+
+    y: vector of real of length m
+
+    p: real, should >= 1
+
+
+    Returns
+    ----------
+    f: dual vector of length n
+
+    g: dual vector of length m
+    """
+    n = x.shape[0]
+    m = y.shape[0]
+    i = 0
+    j = 0
+    f = np.zeros(n)
+    g = np.zeros(m)
+    g[0] = np.abs(x[0] - y[0]) ** p
+    while (i < n - 1) or (j < m - 1):
+        if i == n - 1:
+            j += 1
+            c12 = np.abs(x[i] - y[j]) ** p
+            g[j] = c12 - f[i]
+            continue
+        elif j == m - 1:
+            i += 1
+            c21 = np.abs(x[i] - y[j]) ** p
+            f[i] = c21 - g[j]
+            continue
+
+        c12 = np.abs(x[i] - y[j + 1]) ** p
+        c21 = np.abs(x[i + 1] - y[j]) ** p
+        if diagonal:
+            c22 = np.abs(x[i + 1] - y[j + 1]) ** p
+        if diagonal and (c22 < c12) and (c22 < c21):
+            i += 1
+            j += 1
+            f[i] = 0.5 * (c22 + c21 - c12 + f[i-1] - g[j-1])
+            g[j] = 0.5 * (c22 + c12 - c21 - f[i-1] + g[j-1])
+        elif c12 > c21:
+            i += 1
+            f[i] = c21 - g[j]
+        elif c12 < c21:
             j += 1
             g[j] = c12 - f[i]
     return f, g
