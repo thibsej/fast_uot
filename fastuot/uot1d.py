@@ -162,9 +162,11 @@ def solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-6,
 
         # Line search - convex update
         if line_search == 'homogeneous':
-            t = homogeneous_line_search(f, g, fb-f, gb-g, a, b, rho1, rho2, nits=5)
+            t = homogeneous_line_search(f, g, fb - f, gb - g, a, b, rho1, rho2,
+                                        nits=5)
         if line_search == 'newton':
-            t = newton_line_search(f, g, fb-f, gb-g, a, b, rho1, rho2, nits=5)
+            t = newton_line_search(f, g, fb - f, gb - g, a, b, rho1, rho2,
+                                   nits=5)
         if line_search == 'default':
             t = 2. / (2. + k)
         f = (1 - t) * f + t * fb
@@ -284,15 +286,14 @@ def newton_line_search(fin, gin, d_f, d_g, a, b, rho1, rho2, nits, tmax=1.):
     for k in range(nits):
         ft = fin + t * d_f
         gt = gin + t * d_g
-        transl = rescale_potentials(ft, gt, a, b, rho1, rho2)
 
-        grad = np.sum(a * d_f * np.exp(-(ft + transl) / rho1)) \
-               + np.sum(b * d_g * np.exp(-(gt - transl) / rho2))
+        grad = np.sum(a * d_f * np.exp(-ft / rho1)) \
+               + np.sum(b * d_g * np.exp(-gt / rho2))
         hess = -np.sum(
-            a * d_f ** 2 * np.exp(-(ft + transl) / rho1)) / rho1 \
+            a * d_f ** 2 * np.exp(-ft / rho1)) / rho1 \
                - np.sum(
-            b * d_g ** 2 * np.exp(-(gt - transl) / rho2)) / rho2
-        t = t + (1 / (1 + np.abs(hess))) * (grad / hess)
+            b * d_g ** 2 * np.exp(-(gt) / rho2)) / rho2
+        t = t - (grad / hess)
         t = np.maximum(np.minimum(t, tmax), 0.)
     return t
 
@@ -326,10 +327,6 @@ def lazy_potential(x, y, p):
 
     Parameters
     ----------
-    a: vector of length n with positive entries
-
-    b: vector of length m with positive entries
-
     x: vector of real of length n
 
     y: vector of real of length m
@@ -339,20 +336,9 @@ def lazy_potential(x, y, p):
 
     Returns
     ----------
-    I: vector of length q=n+m-1 of increasing integer in {0,...,n-1}
-
-    J: vector of length q of increasing integer in {0,...,m-1}
-
-    P: vector of length q of positive values of length q
-
     f: dual vector of length n
 
     g: dual vector of length m
-
-    cost: (dual) OT cost
-        sum a_i f_i + sum_j b_j f_j
-        It should be equal to the primal cost
-        = sum_k |x(i)-y(j)|^p where i=I(k), j=J(k)
     """
     n = x.shape[0]
     m = y.shape[0]
@@ -363,7 +349,7 @@ def lazy_potential(x, y, p):
     g = np.zeros(m)
     g[0] = np.abs(x[0] - y[0]) ** p
     for k in range(q - 1):
-        c12 = np.abs(x[i] - y[j+1]) ** p
+        c12 = np.abs(x[i] - y[j + 1]) ** p
         c21 = np.abs(x[i + 1] - y[j]) ** p
         if (c12 < c21) and (i < n - 1):
             i += 1
