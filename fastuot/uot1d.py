@@ -384,12 +384,15 @@ def lazy_potential(x, y, p):
     g = np.zeros(m)
     g[0] = np.abs(x[0] - y[0]) ** p
     for k in range(q - 1):
+        T = np.abs(x[:,None] - y[None,:])**p - f[:,None] - g[None,:]
         if i == n - 1:
             j += 1
+            c12 = np.abs(x[i] - y[j]) ** p
             g[j] = c12 - f[i]
             continue
         elif j == m - 1:
             i += 1
+            c21 = np.abs(x[i] - y[j]) ** p
             f[i] = c21 - g[j]
             continue
 
