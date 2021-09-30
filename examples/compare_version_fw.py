@@ -6,8 +6,7 @@ import cvxpy as cp
 from scipy.sparse import csr_matrix
 
 from fastuot.uot1d import solve_ot, rescale_potentials, solve_uot, \
-    compute_shortest_path_support, build_potential_from_support, \
-    dual_loss, invariant_dual_loss
+    dual_loss, invariant_dual_loss, homogeneous_line_search
 
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
@@ -58,12 +57,13 @@ if __name__ == '__main__':
     # params
     p = 1.5
     rho = .1
-    niter = 500
+    niter = 300
     C = np.abs(x[:, None] - y[None, :]) ** p
 
     result, constr, fr, gr = dual_via_cvxpy(a, b, x, y, p, rho)
     fr, gr = fr.value, gr.value
     plt.imshow(np.log(C - fr[:, None] - gr[None, :]))
+    plt.title('CVXPY')
     plt.show()
 
     # Vanilla FW
@@ -79,10 +79,14 @@ if __name__ == '__main__':
 
         # update
         I, J, P, fs, gs, _ = solve_ot(A, B, x, y, p)
-        gamma = 2. / (2. + k)  # fixed decaying weights
+        # gamma = 2. / (2. + k)  # fixed decaying weights
+        gamma = homogeneous_line_search(f, g, fs-f, gs-g, a, b, rho, rho, nits=5)
+        # print(gamma)
         f = f + gamma * (fs - f)
         g = g + gamma * (gs - g)
+
     plt.imshow(np.log(C - f[:, None] - g[None, :]))
+    plt.title('FW')
     plt.show()
 
     # Pairwise FW
@@ -112,29 +116,40 @@ if __name__ == '__main__':
                 score = dscore
                 fa, ga = ft, gt
         atoms.append([fs, gs])
+        # TODO: check existence of atom in dictionary
 
-        t = weights[itop]
-        gamma = np.minimum(2. / (2. + k), t)
-        l1 = invariant_dual_loss(f + gamma * (fs - fa), g + gamma * (gs - ga),
-                                 a, b, rho)
-        l2 = invariant_dual_loss(f + t * (fs - fa), g + t * (gs - ga), a, b,
-                                 rho)
-        if l1 < l2:
-            f = f + t * (fs - fa)
-            g = g + t * (gs - ga)
-            weights.append(t)
+        gamma = homogeneous_line_search(f, g, fs-fa, gs-ga, a, b, rho, rho,
+                                        nits=5, tmax=weights[itop])
+        f = f + gamma * (fs - fa)
+        g = g + gamma * (gs - ga)
+        weights.append(gamma)
+        weights[itop] = weights[itop] - gamma
+        if weights[itop] <= 0.:
             atoms.pop(itop)
             weights.pop(itop)
-        else:
-            f = f + gamma * (fs - fa)
-            g = g + gamma * (gs - ga)
-            weights.append(gamma)
-            weights[itop] = weights[itop] - gamma
-            if weights[itop] <= 0.:
-                atoms.pop(itop)
-                weights.pop(itop)
+
+        # gamma = np.minimum(2. / (2. + k), t)
+        # l1 = invariant_dual_loss(f + gamma * (fs - fa), g + gamma * (gs - ga),
+        #                          a, b, rho)
+        # l2 = invariant_dual_loss(f + t * (fs - fa), g + t * (gs - ga), a, b,
+        #                          rho)
+        # if l1 < l2:
+        #     f = f + t * (fs - fa)
+        #     g = g + t * (gs - ga)
+        #     weights.append(t)
+        #     atoms.pop(itop)
+        #     weights.pop(itop)
+        # else:
+        #     f = f + gamma * (fs - fa)
+        #     g = g + gamma * (gs - ga)
+        #     weights.append(gamma)
+        #     weights[itop] = weights[itop] - gamma
+        #     if weights[itop] <= 0.:
+        #         atoms.pop(itop)
+        #         weights.pop(itop)
         print(f"Weights at time {k}", len(weights), len(set(weights)))
     plt.imshow(np.log(C - f[:, None] - g[None, :]))
+    plt.title('PFW')
     plt.show()
 
     # Plot results
