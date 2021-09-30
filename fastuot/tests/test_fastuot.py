@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from fastuot.uot1d import rescale_potentials, dual_loss, init_greed_uot, \
     solve_uot, lazy_potential, solve_ot, homogeneous_line_search, \
-    invariant_dual_loss
+    invariant_dual_loss, newton_line_search
 
 p = 1.5
 
@@ -116,7 +116,7 @@ def test_pot_fw_is_feasible(seed, rho, rho2, mass, niter, linesearch):
                           for b in [0.1, 1.0, 10.0]
                           for c in [0.1, 1.0, 10.0]
                           for d in [0.5, 1., 2.]])
-def test_newton_linesearch_decrease(seed, rho, rho2, mass):
+def test_homogeneous_linesearch_decrease(seed, rho, rho2, mass):
     n = int(15)
     m = int(16)
     np.random.seed(seed)
@@ -129,6 +129,33 @@ def test_newton_linesearch_decrease(seed, rho, rho2, mass):
     _, _, _, fb, gb, _ = solve_ot(a / np.sum(a), b / np.sum(b), x, y, p)
     fc, gc = lazy_potential(x, y, p)
     t = homogeneous_line_search(fb, gb, fc - fb, gc - gb, a, b, rho, rho2,
+                                nits=3)
+    ft, gt = fb + t * (fc - fb), gb + t * (gc - gb)
+    s0 = invariant_dual_loss(fb, gb, a, b, rho, rho2)
+    s1 = invariant_dual_loss(fc, gc, a, b, rho, rho2)
+    st = invariant_dual_loss(ft, gt, a, b, rho, rho2)
+    assert st >= s0 + t * (s1 - s0)
+
+
+@pytest.mark.parametrize('seed,rho,rho2,mass',
+                         [(a, b, c, d)
+                          for a in [1, 2, 3, 4, 5, 6, 7]
+                          for b in [0.1, 1.0, 10.0]
+                          for c in [0.1, 1.0, 10.0]
+                          for d in [0.5, 1., 2.]])
+def test_newton_linesearch_decrease(seed, rho, rho2, mass):
+    n = int(15)
+    m = int(16)
+    np.random.seed(seed)
+    normalize = lambda p: p / np.sum(p)
+    a = normalize(np.random.uniform(size=n))
+    a = mass * a
+    b = normalize(np.random.uniform(size=m))
+    x = np.sort(np.random.uniform(size=n))
+    y = np.sort(np.random.uniform(size=m))
+    _, _, _, fb, gb, _ = solve_ot(a / np.sum(a), b / np.sum(b), x, y, p)
+    fc, gc = lazy_potential(x, y, p)
+    t = newton_line_search(fb, gb, fc - fb, gc - gb, a, b, rho, rho2,
                                 nits=3)
     ft, gt = fb + t * (fc - fb), gb + t * (gc - gb)
     s0 = invariant_dual_loss(fb, gb, a, b, rho, rho2)
