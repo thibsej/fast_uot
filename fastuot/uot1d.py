@@ -162,9 +162,9 @@ def solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-6,
 
         # Line search - convex update
         if line_search == 'homogeneous':
-            t = homogeneous_line_search(f, g, fb, gb, a, b, rho1, rho2, nits=5)
+            t = homogeneous_line_search(f, g, fb-f, gb-g, a, b, rho1, rho2, nits=5)
         if line_search == 'newton':
-            t = newton_line_search(f, g, fb, gb, a, b, rho1, rho2, nits=5)
+            t = newton_line_search(f, g, fb-f, gb-g, a, b, rho1, rho2, nits=5)
         if line_search == 'default':
             t = 2. / (2. + k)
         f = (1 - t) * f + t * fb
@@ -225,7 +225,7 @@ def pairwise_solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100,
     return I, J, P, f, g, cost
 
 
-def homogeneous_line_search(fin, gin, fout, gout, a, b, rho1, rho2, nits,
+def homogeneous_line_search(fin, gin, d_f, d_g, a, b, rho1, rho2, nits,
                             tmax=1.):
     """
     Convex interpolation ft = (1 - t) * fin + t * fout.
@@ -244,16 +244,17 @@ def homogeneous_line_search(fin, gin, fout, gout, a, b, rho1, rho2, nits,
     -------
 
     """
+    # TODO: Recheck formulas
     t = 0.5
     tau1, tau2 = 1. / (1. + (rho2 / rho1)), 1. / (1. + (rho1 / rho2))
     for k in range(nits):
-        ft = (1 - t) * fin + t * fout
-        gt = (1 - t) * gin + t * gout
+        ft = fin + t * d_f
+        gt = gin + t * d_g
 
         # Compute derivatives for F
         a_z = np.sum(a * np.exp(-ft / rho1))
-        a_p = - np.sum(a * np.exp(-ft / rho1) * (fin - fout)) / rho1
-        a_s = np.sum(a * np.exp(-ft / rho1) * (fin - fout) ** 2) / rho1 ** 2
+        a_p = - np.sum(a * np.exp(-ft / rho1) * (-d_f)) / rho1
+        a_s = np.sum(a * np.exp(-ft / rho1) * (-d_f) ** 2) / rho1 ** 2
         a_s = tau1 * a_s * a_z ** (tau1 - 1) \
               + tau1 * (tau1 - 1) * a_p ** 2 * a_z ** (tau1 - 2)
         a_p = tau1 * a_p * a_z ** (tau1 - 1)
@@ -261,8 +262,8 @@ def homogeneous_line_search(fin, gin, fout, gout, a, b, rho1, rho2, nits,
 
         # Compute derivatives for G
         b_z = np.sum(b * np.exp(-gt / rho2))
-        b_p = - np.sum(b * np.exp(-gt / rho2) * (gin - gout)) / rho2
-        b_s = np.sum(b * np.exp(-gt / rho2) * (gin - gout) ** 2) / rho2 ** 2
+        b_p = - np.sum(b * np.exp(-gt / rho2) * (-d_g)) / rho2
+        b_s = np.sum(b * np.exp(-gt / rho2) * (-d_g) ** 2) / rho2 ** 2
         b_s = tau2 * b_s * b_z ** (tau2 - 1) \
               + tau2 * (tau2 - 1) * b_p ** 2 * b_z ** (tau2 - 2)
         b_p = tau2 * b_p * b_z ** (tau2 - 1)
@@ -271,7 +272,7 @@ def homogeneous_line_search(fin, gin, fout, gout, a, b, rho1, rho2, nits,
         # Compute damped Newton step
         loss_p = a_p * b_z + a_z * b_p
         loss_s = a_s * b_z + 2 * a_p * b_p + a_z * b_s
-        t = t - (loss_p / loss_s) / (1 + np.sqrt(loss_p ** 2 / loss_s))
+        t = t + (loss_p / loss_s) / (1 + np.sqrt(loss_p ** 2 / loss_s))
 
         # Clamp to keep a convex combination
         t = np.maximum(np.minimum(t, tmax), 0.)

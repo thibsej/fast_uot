@@ -135,3 +135,5 @@ def test_newton_linesearch_decrease(seed, rho, rho2, mass):
     s1 = invariant_dual_loss(fc, gc, a, b, rho, rho2)
     st = invariant_dual_loss(ft, gt, a, b, rho, rho2)
     assert st >= s0 + t * (s1 - s0)
+
+# TODO: FW yields same answer for all line search
