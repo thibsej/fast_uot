@@ -1,16 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.special import logsumexp
-import cvxpy as cp
 import time as time
 import os
 import torch
 
 from fastuot.uot1d import rescale_potentials, solve_ot
-from fastuot.numpy_sinkhorn import sinkhorn_loop, \
-    fast_homogeneous_loop
+from fastuot.numpy_sinkhorn import sinkhorn_loop, fast_homogeneous_loop
 from fastuot.numpy_sinkhorn import homogeneous_loop as numpy_loop
 from fastuot.torch_sinkhorn import homogeneous_loop as torch_loop
+from fastuot.cvxpy_uot import dual_via_cvxpy
 
 assert torch.cuda.is_available()
 
@@ -20,22 +18,6 @@ if not os.path.isdir(path):
 path = path + "/plots_comparison/"
 if not os.path.isdir(path):
     os.mkdir(path)
-
-
-def dual_via_cvxpy(a, b, x, y, p, rho):
-    C = np.abs(x[:, None] - y[None, :]) ** p
-    f = cp.Variable((x.shape[0]))
-    g = cp.Variable((y.shape[0]))
-    inta = cp.sum(cp.multiply(a, cp.exp(-f / rho)))
-    intb = cp.sum(cp.multiply(b, cp.exp(-g / rho)))
-    constr = [f[:, None] + g[None, :] <= C]
-    objective = cp.Minimize(inta + intb)
-    prob = cp.Problem(objective, constr)
-    result = prob.solve(max_iters=500000, verbose=False,
-                        solver=cp.SCS, eps=1e-7)
-    # result = prob.solve(max_iters=30000, verbose=False,
-    #                     solver=cp.ECOS, abstol=1e-7)
-    return result, constr, f, g
 
 
 if __name__ == '__main__':
@@ -72,7 +54,8 @@ if __name__ == '__main__':
                np.sort(np.random.normal(loc=0.2, size=M))
         C = np.abs(x[:, None] - y[None, :]) ** p
 
-        _, _, f, _ = dual_via_cvxpy(a, b, x, y, p, rho)
+        _, _, f, _ = dual_via_cvxpy(a, b, x, y, p, rho, cpsolv='SCS',
+                                    tol=1e-7, niter=500000)
         fr = f.value
         print("Computed reference potential")
 
@@ -172,9 +155,6 @@ if __name__ == '__main__':
                      np.mean(acc_gpu[j, :, :], axis=0),
                      label=f'Log-GPU ({k})', linestyle='dashed',
                      c=cmap(j / (len(list_eps_lse) + len(list_eps_exp))))
-
-
-
 
     plt.legend()
     plt.xlabel('time', fontsize=16)
