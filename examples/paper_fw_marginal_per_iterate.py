@@ -11,7 +11,7 @@ from fastuot.uot1d import solve_ot, rescale_potentials, dual_loss, \
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
-path = path + "/plots_marginals/"
+path = path + "/paper/"
 if not os.path.isdir(path):
     os.mkdir(path)
 

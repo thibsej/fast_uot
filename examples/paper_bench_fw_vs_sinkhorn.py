@@ -15,7 +15,7 @@ assert torch.cuda.is_available()
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
-path = path + "/plots_comparison/"
+path = path + "/paper/"
 if not os.path.isdir(path):
     os.mkdir(path)
 

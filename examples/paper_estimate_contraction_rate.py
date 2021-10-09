@@ -9,7 +9,7 @@ from fastuot.numpy_sinkhorn import homogeneous_loop as numpy_loop
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
-path = path + "/contractance/"
+path = path + "/paper/"
 if not os.path.isdir(path):
     os.mkdir(path)
 

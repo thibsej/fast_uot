@@ -13,29 +13,54 @@ from fastuot.cvxpy_uot import dual_via_cvxpy
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
-path = path + "/plots_comparison/"
+path = path + "/paper/"
 if not os.path.isdir(path):
     os.mkdir(path)
 
 
-if __name__ == '__main__':
-    # generate data
-    n = int(15)
-    m = int(16)
-    # np.random.seed(0)
-    normalize = lambda p: p / np.sum(p)
+def normalize(x):
+    return x / np.sum(x)
+
+
+def gauss(grid, mu, sig):
+    return np.exp(-0.5* ((grid-mu) / (sig))**2)
+
+
+def generate_random_measure(n, m):
     a = normalize(np.random.uniform(size=n))
     b = normalize(np.random.uniform(size=m))
     x = np.sort(np.random.uniform(size=n))
     y = np.sort(np.random.uniform(size=m))
+    return a, x, b, y
+
+
+def generate_measure(n, m):
+    x = np.linspace(0.2, 0.4, num=n)
+    a = np.zeros_like(x)
+    a[:n // 2] = 2.
+    a[n // 2:] = 3.
+    y = np.linspace(0.45, 0.95, num=m)
+    a = normalize(a)
+    b = normalize(gauss(y, 0.6, 0.03)
+                  + gauss(y, 0.7, 0.03)
+                  + gauss(y, 0.8, 0.03))
+    return a, x, b, y
+
+
+if __name__ == '__main__':
+    # np.random.seed(0)
+    n, m = 50, 50
+    a, x, b, y = generate_measure(n, m)
+    # a, x, b, y = generate_random_measure(n, m)
+
 
     # params
     p = 1.5
-    rho = .1
+    rho = 1.
     niter = 500
     C = np.abs(x[:, None] - y[None, :]) ** p
 
-    result, constr, fr, gr = dual_via_cvxpy(a, b, x, y, p, rho, tol=1e-10)
+    result, constr, fr, gr = dual_via_cvxpy(a, b, x, y, p, rho, cpsolv='SCS', tol=1e-10)
     fr, gr = fr.value, gr.value
     plt.imshow(np.log(C - fr[:, None] - gr[None, :]))
     plt.title('CVXPY')
