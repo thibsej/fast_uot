@@ -6,6 +6,13 @@ import os
 from fastuot.numpy_sinkhorn import sinkhorn_loop
 from fastuot.numpy_sinkhorn import homogeneous_loop as numpy_loop
 
+path = os.getcwd() + "/output/"
+if not os.path.isdir(path):
+    os.mkdir(path)
+path = path + "/contractance/"
+if not os.path.isdir(path):
+    os.mkdir(path)
+
 
 def gauss(grid, mu, sig):
     return np.exp(-0.5* ((grid-mu) / (sig))**2)
@@ -28,12 +35,15 @@ def generate_measure(N):
     return a, x, b, y
 
 if __name__ == '__main__':
-    eps_l = [.1, 1.]
+    eps_l = [.01, .1, 1., 10.]
     N = 100
     a, x, b, y = generate_measure(N)
     C = (x[:, None] - y[None, :])**2
-    scale = [-3., -2.5, -2., -1.5, -1., -0.5, -0., 0.5, 1., 1.5, 2., 2.5, 3.]
+    scale = np.arange(-3., 4.5, 0.5)
     colors = ['r', 'b', 'g', 'c']
+    colors = [(1., 0., 0., 1.), (.67, 0., .33, 1.), (.33, 0., .67, 1.),
+              (0., 0., 1., 1.)]
+    # TODO: degrading colors
 
     for r in range(len(eps_l)):
         eps = eps_l[r]
@@ -46,7 +56,6 @@ if __name__ == '__main__':
                 f_tmp = fr.copy()
                 fr, gr = numpy_loop(fr, a, b, C, eps, rhot)
                 if np.amax(np.abs(fr - f_tmp)) < 1e-14:
-                    print(np.amax(np.abs(fr - f_tmp)))
                     break
 
             # Compute error for Sinkhorn
@@ -85,11 +94,12 @@ if __name__ == '__main__':
                  label=f'S, $\epsilon$={eps}')
         plt.plot(scale, rate_ti + rate_th, c=colors[r],
                  label=f'TI, $\epsilon$={eps}')
-        plt.vlines(np.log10(eps), -6., 0., colors=colors[r], linestyles='dotted')
+        # plt.vlines(np.log10(eps), -6., 0., colors=colors[r], linestyles='dotted')
 
     plt.xlabel('$\log_{10}(\\rho)$', fontsize=15)
     plt.ylabel('Log-contraction rate', fontsize=15)
     plt.tight_layout()
     plt.legend()
+    plt.savefig(path + 'plot_log_contraction_rate.eps', format='eps')
     plt.show()
 
