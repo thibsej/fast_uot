@@ -87,6 +87,9 @@ if __name__ == '__main__':
                  label=f'TI, $\epsilon$={eps}')
         plt.vlines(np.log10(eps), -6., 0., colors=colors[r], linestyles='dotted')
 
+    plt.xlabel('$\log_{10}(\\rho)$', fontsize=15)
+    plt.ylabel('Log-contraction rate', fontsize=15)
+    plt.tight_layout()
     plt.legend()
     plt.show()
 
