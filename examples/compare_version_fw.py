@@ -32,9 +32,8 @@ if __name__ == '__main__':
     # params
     p = 1.5
     rho = .1
-    niter = 5000
+    niter = 500
     C = np.abs(x[:, None] - y[None, :]) ** p
-    rho = np.amin(C)
 
     result, constr, fr, gr = dual_via_cvxpy(a, b, x, y, p, rho, tol=1e-10)
     fr, gr = fr.value, gr.value
@@ -46,7 +45,6 @@ if __name__ == '__main__':
     # Vanilla FW
     ###########################################################################
     f, g = np.zeros_like(a), np.zeros_like(b)
-    f, g = lazy_potential(x, y, p)
     dual_fw, norm_fw = [], []
     for k in range(niter):
         transl = rescale_potentials(f, g, a, b, rho, rho)
@@ -70,7 +68,6 @@ if __name__ == '__main__':
     # Vanilla FW with dual line search
     ###########################################################################
     f, g = np.zeros_like(a), np.zeros_like(b)
-    f, g = lazy_potential(x, y, p)
     dual_lfw, norm_lfw = [], []
     for k in range(niter):
         transl = rescale_potentials(f, g, a, b, rho, rho)
@@ -95,7 +92,6 @@ if __name__ == '__main__':
     # Vanilla FW with homogeneous line search
     ###########################################################################
     f, g = np.zeros_like(a), np.zeros_like(b)
-    f, g = lazy_potential(x, y, p)
     dual_hfw, norm_hfw = [], []
     for k in range(niter):
         transl = rescale_potentials(f, g, a, b, rho, rho)
@@ -120,9 +116,6 @@ if __name__ == '__main__':
     # Pairwise FW
     ###########################################################################
     f, g = np.zeros_like(a), np.zeros_like(b)
-    f, g = lazy_potential(x, y, p)
-    pdg = primal_dual_gap(a, b, x, y, p, f, g, P, I, J, rho)
-    print(pdg)
     dual_pfw, norm_pfw = [], []
     atoms = [[f, g]]
     weights = [1.]
@@ -160,10 +153,10 @@ if __name__ == '__main__':
             atoms.append([fs, gs])
             weights.append(0.)
 
-        # gamma = homogeneous_line_search(f, g, fs-fa, gs-ga, a, b, rho, rho,
-        #                                 nits=5, tmax=weights[itop])
-        gamma = newton_line_search(f, g, fs - fa, gs - ga, a, b, rho, rho,
-                                   nits=5, tmax=weights[itop])
+        gamma = homogeneous_line_search(f, g, fs-fa, gs-ga, a, b, rho, rho,
+                                        nits=5, tmax=weights[itop])
+        # gamma = newton_line_search(f, g, fs - fa, gs - ga, a, b, rho, rho,
+        #                            nits=5, tmax=weights[itop])
         f = f + gamma * (fs - fa)
         g = g + gamma * (gs - ga)
         weights[jtop] = weights[jtop] + gamma
