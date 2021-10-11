@@ -1,13 +1,11 @@
 import os
+import time
 
 import numpy as np
 import matplotlib.pyplot as plt
-import cvxpy as cp
-from scipy.sparse import csr_matrix
 
-from fastuot.uot1d import solve_ot, rescale_potentials, solve_uot, \
-    dual_loss, invariant_dual_loss, homogeneous_line_search, \
-    newton_line_search, primal_dual_gap, lazy_potential
+from fastuot.uot1d import solve_ot, rescale_potentials, invariant_dual_loss, \
+    homogeneous_line_search
 from fastuot.cvxpy_uot import dual_via_cvxpy
 
 path = os.getcwd() + "/output/"
@@ -18,12 +16,21 @@ if not os.path.isdir(path):
     os.mkdir(path)
 
 
+rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True}
+plt.rcParams.update(rc)
+lw =2
+
+
 def normalize(x):
     return x / np.sum(x)
 
 
 def gauss(grid, mu, sig):
-    return np.exp(-0.5* ((grid-mu) / (sig))**2)
+    return np.exp(-0.5 * ((grid-mu) / sig) ** 2)
+
+
+def hilbert_norm(f):
+    return np.amax(np.abs(f)) - np.amin(np.abs(f))
 
 
 def generate_random_measure(n, m):
@@ -48,21 +55,21 @@ def generate_measure(n, m):
 
 
 if __name__ == '__main__':
-    # np.random.seed(0)
+    np.random.seed(6)
     n, m = 50, 50
-    a, x, b, y = generate_measure(n, m)
-    # a, x, b, y = generate_random_measure(n, m)
+    # a, x, b, y = generate_measure(n, m)
+    a, x, b, y = generate_random_measure(n, m)
 
 
     # params
     p = 1.5
-    rho = 1.
-    niter = 500
+    rho = .05
+    niter = 2000
     C = np.abs(x[:, None] - y[None, :]) ** p
 
-    result, constr, fr, gr = dual_via_cvxpy(a, b, x, y, p, rho, cpsolv='SCS', tol=1e-10)
+    result, constr, fr, gr = dual_via_cvxpy(a, b, x, y, p, rho, cpsolv='ECOS', tol=1e-10)
     fr, gr = fr.value, gr.value
-    plt.imshow(np.log(C - fr[:, None] - gr[None, :]))
+    plt.imshow(np.log10(C - fr[:, None] - gr[None, :]))
     plt.title('CVXPY')
     plt.show()
 
@@ -70,12 +77,12 @@ if __name__ == '__main__':
     # Vanilla FW
     ###########################################################################
     f, g = np.zeros_like(a), np.zeros_like(b)
+    transl = rescale_potentials(f, g, a, b, rho, rho)
+    f, g = f + transl, g - transl
     dual_fw, norm_fw = [], []
+    time_fw = []
     for k in range(niter):
-        transl = rescale_potentials(f, g, a, b, rho, rho)
-        f, g = f + transl, g - transl
-        norm_fw.append(np.log(np.amax(np.abs(f - fr))))
-        dual_fw.append(invariant_dual_loss(f, g, a, b, rho))
+        t0 = time.time()
         A = np.exp(-f / rho) * a
         B = np.exp(-g / rho) * b
 
@@ -84,6 +91,15 @@ if __name__ == '__main__':
         gamma = 2. / (2. + k)  # fixed decaying weights
         f = f + gamma * (fs - f)
         g = g + gamma * (gs - g)
+        transl = rescale_potentials(f, g, a, b, rho, rho)
+        f, g = f + transl, g - transl
+        if np.isnan(f).any():
+            break
+
+        time_fw.append(time.time() - t0)
+        norm_fw.append(np.log10(np.amax(np.abs(f - fr))))
+        dual_fw.append(invariant_dual_loss(f, g, a, b, rho))
+        # norm_fw.append(np.log(hilbert_norm(f - fr)))
 
     plt.imshow(np.log(C - f[:, None] - g[None, :]))
     plt.title('FW')
@@ -92,37 +108,37 @@ if __name__ == '__main__':
     ###########################################################################
     # Vanilla FW with dual line search
     ###########################################################################
-    f, g = np.zeros_like(a), np.zeros_like(b)
-    dual_lfw, norm_lfw = [], []
-    for k in range(niter):
-        transl = rescale_potentials(f, g, a, b, rho, rho)
-        f, g = f + transl, g - transl
-        norm_lfw.append(np.log(np.amax(np.abs(f - fr))))
-        dual_lfw.append(invariant_dual_loss(f, g, a, b, rho))
-        A = np.exp(-f / rho) * a
-        B = np.exp(-g / rho) * b
-
-        # update
-        I, J, P, fs, gs, _ = solve_ot(A, B, x, y, p)
-        gamma = newton_line_search(f, g, fs - f, gs - g, a, b, rho, rho,
-                                        nits=5)
-        f = f + gamma * (fs - f)
-        g = g + gamma * (gs - g)
-
-    plt.imshow(np.log(C - f[:, None] - g[None, :]))
-    plt.title('Linesearch-FW')
-    plt.show()
+    # f, g = np.zeros_like(a), np.zeros_like(b)
+    # dual_lfw, norm_lfw = [], []
+    # for k in range(niter):
+    #     transl = rescale_potentials(f, g, a, b, rho, rho)
+    #     f, g = f + transl, g - transl
+    #     norm_lfw.append(np.log10(np.amax(np.abs(f - fr))))
+    #     dual_lfw.append(invariant_dual_loss(f, g, a, b, rho))
+    #     A = np.exp(-f / rho) * a
+    #     B = np.exp(-g / rho) * b
+    #
+    #     # update
+    #     I, J, P, fs, gs, _ = solve_ot(A, B, x, y, p)
+    #     gamma = newton_line_search(f, g, fs - f, gs - g, a, b, rho, rho,
+    #                                     nits=5)
+    #     f = f + gamma * (fs - f)
+    #     g = g + gamma * (gs - g)
+    #
+    # plt.imshow(np.log(C - f[:, None] - g[None, :]))
+    # plt.title('Linesearch-FW')
+    # plt.show()
 
     ###########################################################################
     # Vanilla FW with homogeneous line search
     ###########################################################################
     f, g = np.zeros_like(a), np.zeros_like(b)
+    transl = rescale_potentials(f, g, a, b, rho, rho)
+    f, g = f + transl, g - transl
     dual_hfw, norm_hfw = [], []
+    time_hfw = []
     for k in range(niter):
-        transl = rescale_potentials(f, g, a, b, rho, rho)
-        f, g = f + transl, g - transl
-        norm_hfw.append(np.log(np.amax(np.abs(f - fr))))
-        dual_hfw.append(invariant_dual_loss(f, g, a, b, rho))
+        t0 = time.time()
         A = np.exp(-f / rho) * a
         B = np.exp(-g / rho) * b
 
@@ -132,6 +148,15 @@ if __name__ == '__main__':
                                         nits=5)
         f = f + gamma * (fs - f)
         g = g + gamma * (gs - g)
+        transl = rescale_potentials(f, g, a, b, rho, rho)
+        f, g = f + transl, g - transl
+        if np.isnan(f).any():
+            break
+
+        time_hfw.append(time.time() - t0)
+        norm_hfw.append(np.log10(np.amax(np.abs(f - fr))))
+        # norm_hfw.append(np.log(hilbert_norm(f - fr)))
+        dual_hfw.append(invariant_dual_loss(f, g, a, b, rho))
 
     plt.imshow(np.log(C - f[:, None] - g[None, :]))
     plt.title('Homogeneous-FW')
@@ -141,14 +166,14 @@ if __name__ == '__main__':
     # Pairwise FW
     ###########################################################################
     f, g = np.zeros_like(a), np.zeros_like(b)
+    transl = rescale_potentials(f, g, a, b, rho, rho)
+    f, g = f + transl, g - transl
     dual_pfw, norm_pfw = [], []
+    time_pfw = []
     atoms = [[f, g]]
     weights = [1.]
     for k in range(niter):
-        transl = rescale_potentials(f, g, a, b, rho, rho)
-        f, g = f + transl, g - transl
-        norm_pfw.append(np.log(np.amax(np.abs(f - fr))))
-        dual_pfw.append(invariant_dual_loss(f, g, a, b, rho))
+        t0 = time.time()
         A = np.exp(-f / rho) * a
         B = np.exp(-g / rho) * b
 
@@ -180,15 +205,24 @@ if __name__ == '__main__':
 
         gamma = homogeneous_line_search(f, g, fs-fa, gs-ga, a, b, rho, rho,
                                         nits=5, tmax=weights[itop])
-        # gamma = newton_line_search(f, g, fs - fa, gs - ga, a, b, rho, rho,
-        #                            nits=5, tmax=weights[itop])
         f = f + gamma * (fs - fa)
         g = g + gamma * (gs - ga)
+        transl = rescale_potentials(f, g, a, b, rho, rho)
+        f, g = f + transl, g - transl
+
         weights[jtop] = weights[jtop] + gamma
         weights[itop] = weights[itop] - gamma
         if weights[itop] <= 0.:
             atoms.pop(itop)
             weights.pop(itop)
+        if np.isnan(f).any():
+            break
+
+        time_pfw.append(time.time() - t0)
+        norm_pfw.append(np.log10(np.amax(np.abs(f - fr))))
+        # norm_pfw.append(np.log(hilbert_norm(f - fr)))
+        dual_pfw.append(invariant_dual_loss(f, g, a, b, rho))
+
     plt.imshow(np.log(C - f[:, None] - g[None, :]))
     plt.title('PFW')
     plt.show()
@@ -196,19 +230,29 @@ if __name__ == '__main__':
     ###########################################################################
     # Plot dual loss and norm
     ###########################################################################
-    plt.plot(dual_fw, label='FW')
-    plt.plot(dual_lfw, label='LFW')
-    plt.plot(dual_hfw, label='HFW')
-    plt.plot(dual_pfw, label='PFW')
-    plt.legend()
-    plt.title('DUAL')
-    plt.show()
+    # plt.plot(dual_fw, label='FW')
+    # # plt.plot(dual_lfw, label='LFW')
+    # plt.plot(dual_hfw, label='HFW')
+    # plt.plot(dual_pfw, label='PFW')
+    # plt.legend()
+    # plt.title('DUAL')
+    # plt.show()
 
     # Plot results
-    plt.plot(norm_fw, label='FW')
-    plt.plot(norm_lfw, label='LFW')
-    plt.plot(norm_hfw, label='HFW')
-    plt.plot(norm_pfw, label='PFW')
-    plt.legend()
-    plt.title('NORM')
+    t_fw = np.median(np.array(time_fw))
+    t_hfw = np.median(np.array(time_hfw))
+    t_pfw = np.median(np.array(time_pfw))
+    plt.figure(figsize=(5, 4))
+    # plt.plot(norm_lfw, label='LFW')
+    plt.plot(t_hfw * np.arange(len(norm_hfw)),  np.array(norm_hfw),
+             label='$HFW$', c='r', linewidth=lw)
+    plt.plot(t_pfw * np.arange(len(norm_pfw)),  np.array(norm_pfw),
+             label='$PFW$', c='g', linewidth=lw)
+    plt.plot(t_fw * np.arange(len(norm_fw)),  np.array(norm_fw),
+             label='$FW$', c='b', linewidth=lw)
+    plt.xlabel('$Time$', fontsize=16)
+    plt.ylabel('$\log_{10}\|f_t - f^*\|_\infty$', fontsize=16)
+    plt.legend(fontsize=10)
+    plt.tight_layout()
+    plt.savefig(path + f'plot_fw_comparison.pdf')
     plt.show()

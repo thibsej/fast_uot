@@ -109,7 +109,9 @@ def logsumexp(f, a, stable_lse=True):
         return xm + np.log(np.sum(np.exp(f + np.log(a) - xm)))
 
 
-def rescale_potentials(f, g, a, b, rho1, rho2, stable_lse=True):
+def rescale_potentials(f, g, a, b, rho1, rho2=None, stable_lse=True):
+    if rho2 is None:
+        rho2 = rho1
     tau = (rho1 * rho2) / (rho1 + rho2)
     transl = tau * (logsumexp(-f / rho1, a, stable_lse=stable_lse) -
                     logsumexp(-g / rho2, b, stable_lse=stable_lse))
@@ -138,6 +140,10 @@ def invariant_dual_loss(f, g, a, b, rho1, rho2=None):
     int_b = np.sum(b * np.exp(-g / rho2))
     loss = loss - (rho1 + rho2) * (int_a ** tau1) * (int_b ** tau2)
     return loss
+
+
+def hilbert_norm(f):
+    return np.amax(np.abs(f)) - np.amin(np.abs(f))
 
 
 def primal_dual_gap(a, b, x, y, p, f, g, P, I, J, rho1, rho2=None):
@@ -321,6 +327,8 @@ def newton_line_search(fin, gin, d_f, d_g, a, b, rho1, rho2, nits, tmax=1.):
     for k in range(nits):
         ft = fin + t * d_f
         gt = gin + t * d_g
+        la = rescale_potentials(ft, gt, a, b, rho1, rho2)
+        ft, gt = ft + la, gt - la
 
         grad = np.sum(a * d_f * np.exp(-ft / rho1)) \
                + np.sum(b * d_g * np.exp(-gt / rho2))

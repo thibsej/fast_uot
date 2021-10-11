@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import time as time
 import os
 
 from fastuot.numpy_sinkhorn import sinkhorn_loop
@@ -12,6 +11,9 @@ if not os.path.isdir(path):
 path = path + "/paper/"
 if not os.path.isdir(path):
     os.mkdir(path)
+
+rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True}
+plt.rcParams.update(rc)
 
 
 def gauss(grid, mu, sig):

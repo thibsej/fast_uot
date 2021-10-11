@@ -12,6 +12,9 @@ def sinky(C, g, b, eps):
     return - eps * logsumexp(np.log(b)[None, :] + (g[None, :] - C) / eps,
                              axis=1)
 
+def softmin(a, f, rho):
+    return - rho * logsumexp(np.log(a) - f /rho)
+
 
 def aprox(f, eps, rho):
     return (1. / (1. + (eps / rho))) * f
@@ -74,6 +77,23 @@ def homogeneous_loop(f, a, b, C, eps, rho, rho2=None):
     # Update on G
     g = sinkx(C, f, a, eps)
     g = aprox(g, eps, rho2)
+
+    # Update on F
+    f = sinky(C, g, b, eps)
+    f = aprox(f, eps, rho)
+
+    # Update on lambda
+    t = rescale_potentials(f, g, a, b, rho, rho2)
+
+    return f + t, g - t
+
+
+def homogeneous_loop2(f, a, b, C, eps, rho, rho2=None):
+    if rho2 is None:
+        rho2 = rho
+    # Update on G
+    g = sinkx(C, f, a, eps)
+    g = aprox(g, eps, rho2)
     t = rescale_potentials(f, g, a, b, rho, rho2)
     g = g - t
 
@@ -122,6 +142,29 @@ def full_loop(f, a, b, C, eps, rho, rho2=None):
     f = f + ts + tr
 
     return f, g
+
+
+def faster_loop(f, a, b, C, eps, rho):
+    g = aprox(sinkx(C, f, a, eps), eps, rho) \
+        - 0.5 * (eps / (eps + rho)) * softmin(a, f, rho)
+    g = g - (eps / (eps + 2 * rho)) * softmin(b, g, rho)
+    f = aprox(sinky(C, g, b, eps), eps, rho) \
+        - 0.5 * (eps / (eps + rho)) * softmin(b, g, rho)
+    f = f - (eps / (eps + 2 * rho)) * softmin(a, f, rho)
+    return f, g
+
+
+def faster_loop2(f, a, b, C, eps, rho):
+    g = aprox(sinkx(C, f, a, eps), eps, rho) \
+        - 0.5 * (eps / (eps + rho)) * softmin(a, f, rho)
+    t = rescale_potentials(f, g, a, b, rho)
+    g = g - t
+    f = aprox(sinky(C, g, b, eps), eps, rho) \
+        - 0.5 * (eps / (eps + rho)) * softmin(b, g, rho)
+    t = rescale_potentials(f, g, a, b, rho)
+    f = f + t
+    return f, g - t
+
 
 
 def rescale_exp(u, v, a, b, rho, eps):

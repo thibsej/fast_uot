@@ -2,11 +2,8 @@ import os
 
 import numpy as np
 import matplotlib.pyplot as plt
-import cvxpy as cp
-from scipy.sparse import csr_matrix
 
-from fastuot.uot1d import solve_ot, rescale_potentials, dual_loss, \
-    lazy_potential
+from fastuot.uot1d import solve_ot, rescale_potentials
 
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
@@ -14,6 +11,10 @@ if not os.path.isdir(path):
 path = path + "/paper/"
 if not os.path.isdir(path):
     os.mkdir(path)
+
+rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True}
+plt.rcParams.update(rc)
+
 
 def gauss(grid, mu, sig):
     return np.exp(-0.5* ((grid-mu) / (sig))**2)
@@ -45,7 +46,7 @@ def generate_sample_measure2():
 
 
 def plot_figstep(k):
-    plt.figure(figsize=(12, 4))
+    plt.figure(figsize=(12, 5))
     plt.plot(grid, a, c='r', linestyle='dotted', label='input 1')
     plt.plot(grid, b, c='b', linestyle='dotted', label='input 2')
     plt.plot(grid, Ar, c='m', linestyle='dotted', label='target 1')
@@ -54,13 +55,13 @@ def plot_figstep(k):
     plt.plot(grid, B, c='b', label='marg 2')
     plt.fill_between(grid, Ar, A, color=(0.95,0.55,0.55,0.3))
     plt.fill_between(grid, Br, B, color=(0.55,0.55,0.95,0.3))
-    plt.title(f'Iterate {k}')
+    plt.title(f'Iterate {k}', fontsize=20)
     plt.ylim(0.0, 0.0065)
-    plt.xlim(0.1, 0.91)
+    plt.xlim(0.15, 0.91)
     plt.axis('off')
-    plt.legend()
+    plt.legend(loc=9, fontsize=14)
     plt.tight_layout()
-    plt.savefig(path + f'sequence_marginals_fw_iter_{k}.eps', format='eps')
+    plt.savefig(path + f'sequence_marginals_fw_iter_{k}.pdf')
     plt.show()
 
 def fw_step(f, g, a, b, rho1, rho2, k):
@@ -83,14 +84,14 @@ if __name__ == '__main__':
     # params
     p = 2.
     rho = 0.1
-    niter = 5
+    niter = 3
 
     fr, gr = np.zeros_like(a), np.zeros_like(b)
     for k in range(50000):
         fr, gr, Ar, Br = fw_step(fr, gr, a, b, rho, rho, k)
 
     f, g = np.zeros_like(a), np.zeros_like(b)
-    _, _, _, f, g, _ = solve_ot(a, b, grid, grid, p)
+    # _, _, _, f, g, _ = solve_ot(a, b, grid, grid, p)
     for k in range(niter):
         f, g, A, B = fw_step(f, g, a, b, rho, rho, k)
         plot_figstep(k)
