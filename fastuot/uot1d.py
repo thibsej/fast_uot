@@ -199,7 +199,7 @@ def solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-10,
     I, J, P, _, _, cost = solve_ot(A, B, x, y, p)
     return I, J, P, f, g, cost
 
-
+@jit(nopython=True)
 def pairwise_solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-10,
                        greed_init=True, stable_lse=True):
     if rho2 is None:

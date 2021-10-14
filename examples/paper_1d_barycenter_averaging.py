@@ -50,7 +50,7 @@ def generate_mixtures(K, nsampl, sig):
 
 
 if __name__ == '__main__':
-    compute_data = True
+    compute_data = False
 
     m = 1000  # size of the grid
     grid_pw = np.linspace(0, 1, m)
@@ -121,7 +121,7 @@ if __name__ == '__main__':
     plt.legend(loc=9, fontsize=16)
     setup_axes(b)
     plt.tight_layout()
-    plt.savefig(path + 'plot_unbalanced_barycenter.pdf')
+    plt.savefig(path + "/paper/" + 'plot_unbalanced_barycenter.pdf')
     plt.show()
 
     # Plot dual score

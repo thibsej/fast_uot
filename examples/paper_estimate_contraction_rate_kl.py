@@ -2,15 +2,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-from fastuot.numpy_berg import sinkhorn_loop, homogeneous_loop
+from fastuot.numpy_sinkhorn import sinkhorn_loop, faster_loop
+from fastuot.numpy_sinkhorn import homogeneous_loop as numpy_loop
+from fastuot.uot1d import hilbert_norm, rescale_potentials
 
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
 if not os.path.isdir(path + "/paper/"):
     os.mkdir(path + "/paper/")
-if not os.path.isdir(path + "/rateberg/"):
-    os.mkdir(path + "/rateberg/")
+if not os.path.isdir(path + "/ratekl/"):
+    os.mkdir(path + "/ratekl/")
 
 rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True}
 plt.rcParams.update(rc)
@@ -50,10 +52,10 @@ if __name__ == '__main__':
     # Generate data plots
     ###########################################################################
     if compute_data:
-        np.save(path + "/rateberg/" + f"rho_scale.npy", rho_scale)
+        np.save(path + "/ratekl/" + f"rho_scale.npy", rho_scale)
         for r in range(len(eps_l)):
-            epst = 10**eps_l[r]
-            rate_s, rate_ti = [], []
+            epst = 10 ** eps_l[r]
+            rate_s, rate_ti, rate_f = [], [], []
             for s in rho_scale:
                 rhot = 10**s
                 print(f"(eps, rho) = {(epst, rhot)}")
@@ -62,11 +64,10 @@ if __name__ == '__main__':
                 for i in range(50000):
                     f_tmp = fr.copy()
                     if epst <= rhot:
-                        fr, gr = homogeneous_loop(fr, a, b, C, epst, rhot)
+                        fr, gr = numpy_loop(fr, a, b, C, epst, rhot)
                     else:
                         fr, gr = sinkhorn_loop(fr, a, b, C, epst, rhot)
-                    # print(np.amax(np.abs(fr - f_tmp)))
-                    if (np.amax(np.abs(fr - f_tmp)) < 1e-15):
+                    if np.amax(np.abs(fr - f_tmp)) < 1e-15:
                         break
 
                 # Compute error for F - Sinkhorn
@@ -75,8 +76,9 @@ if __name__ == '__main__':
                 for i in range(5000):
                     f_tmp = f.copy()
                     f, g = sinkhorn_loop(f, a, b, C, epst, rhot)
-                    err_s.append(np.amax(np.abs(f - fr)))
-                    if np.amax(np.abs(f - fr)) < 1e-12:
+                    t = rescale_potentials(f, g, a, b, rhot)
+                    err_s.append(np.amax(np.abs(f + t - fr)))
+                    if np.amax(np.abs(f + t - fr)) < 1e-12:
                         break
                 err_s = np.log10(np.array(err_s))
                 err_s = err_s[1:] - err_s[:-1]
@@ -87,36 +89,61 @@ if __name__ == '__main__':
                 f, g = np.zeros_like(a), np.zeros_like(b)
                 for i in range(5000):
                     f_tmp = f.copy()
-                    f, g = homogeneous_loop(f, a, b, C, epst, rhot)
-                    err_ti.append(np.amax(np.abs(f - fr)))
-                    if np.amax(np.abs(f - fr)) < 1e-12:
+                    f, g = numpy_loop(f, a, b, C, epst, rhot)
+                    t = rescale_potentials(f, g, a, b, rhot)
+                    err_ti.append(np.amax(np.abs(f + t - fr)))
+                    if np.amax(np.abs(f + t - fr)) < 1e-12:
                         break
                 err_ti = np.log10(np.array(err_ti))
                 err_ti = err_ti[1:] - err_ti[:-1]
                 rate_ti.append(np.median(err_ti))
 
+                # Compute error for H - Sinkhorn
+                err_f = []
+                f, g = np.zeros_like(a), np.zeros_like(b)
+                for i in range(5000):
+                    f_tmp = f.copy()
+                    f, g = faster_loop(f, a, b, C, epst, rhot)
+                    t = rescale_potentials(f, g, a, b, rhot)
+                    err_f.append(np.amax(np.abs(f + t - fr)))
+                    if np.amax(np.abs(f + t - fr)) < 1e-12:
+                        break
+                err_f = np.log10(np.array(err_f))
+                err_f = err_f[1:] - err_f[:-1]
+                rate_f.append(np.median(err_f))
+
             # Plot results
-            np.save(path + "/rateberg/" + f"rate_f_sinkhorn_berg_eps{epst}.npy",
-                    np.array(rate_s))
-            np.save(path + "/rateberg/" + f"rate_g_sinkhorn_berg_eps{epst}.npy",
-                    np.array(rate_ti))
+            np.save(
+                path + "/ratekl/" + f"rate_f_sinkhorn_kl_eps{epst}.npy",
+                np.array(rate_s))
+            np.save(
+                path + "/ratekl/" + f"rate_g_sinkhorn_kl_eps{epst}.npy",
+                np.array(rate_ti))
+            np.save(
+                path + "/ratekl/" + f"rate_h_sinkhorn_kl_eps{epst}.npy",
+                np.array(rate_f))
+
 
     ###########################################################################
     # Make plots
     ###########################################################################
     plt.figure(figsize=(8, 5))
-    rho_scale = np.load(path + "/rateberg/" + f"rho_scale.npy")
+    rho_scale = np.load(path + "/ratekl/" + f"rho_scale.npy")
     for r in range(len(eps_l)):
-        epst = 10**eps_l[r]
-        rate_f = np.load(path + "/rateberg/" + f"rate_f_sinkhorn_berg_eps{epst}.npy")
-        rate_g = np.load(path + "/rateberg/" + f"rate_g_sinkhorn_berg_eps{epst}.npy")
-        plt.plot(rho_scale, rate_f, c=colors[r], linestyle='dashed',
+        epst = 10 ** eps_l[r]
+        rate_s = np.load(path + "/ratekl/" + f"rate_f_sinkhorn_kl_eps{epst}.npy")
+        rate_ti = np.load(path + "/ratekl/" + f"rate_g_sinkhorn_kl_eps{epst}.npy")
+        rate_f = np.load(path + "/ratekl/" + f"rate_h_sinkhorn_kl_eps{epst}.npy")
+        plt.plot(rho_scale, rate_s, c=colors[r], linestyle='dashed',
                  label=f'$S,\,\epsilon=${epst}')
-        plt.plot(rho_scale, rate_g, c=colors[r],
+        plt.plot(rho_scale, rate_ti, c=colors[r], linestyle='dotted',
                  label=f'$TI,\,\epsilon=${epst}')
-    plt.xlabel('$\log_{10}(\\rho)$', fontsize=20)
-    plt.ylabel('$Log$-$contraction$ $rate$', fontsize=20)
+        plt.plot(rho_scale, rate_f, c=colors[r],
+                 label=f'$F,\,\epsilon=${epst}')
+
+    plt.xlabel('$\log_{10}(\\rho)$', fontsize=15)
+    plt.ylabel('$Log$-$contraction$ $rate$', fontsize=15)
     plt.legend(fontsize=10)
     plt.tight_layout()
-    plt.savefig(path + "/paper/" + 'plot_log_contraction_berg.pdf')
+    plt.savefig(path + "/paper/" + 'plot_log_contraction_rate_faster.pdf')
     plt.show()
