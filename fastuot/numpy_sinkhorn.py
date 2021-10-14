@@ -147,10 +147,10 @@ def full_loop(f, a, b, C, eps, rho, rho2=None):
 def faster_loop(f, a, b, C, eps, rho):
     g = aprox(sinkx(C, f, a, eps), eps, rho) \
         - 0.5 * (eps / (eps + rho)) * softmin(a, f, rho)
-    g = g - (eps / (eps + 2 * rho)) * softmin(b, g, rho)
+    g = g + (eps / (eps + 2 * rho)) * softmin(b, g, rho)
     f = aprox(sinky(C, g, b, eps), eps, rho) \
         - 0.5 * (eps / (eps + rho)) * softmin(b, g, rho)
-    f = f - (eps / (eps + 2 * rho)) * softmin(a, f, rho)
+    f = f + (eps / (eps + 2 * rho)) * softmin(a, f, rho)
     return f, g
 
 

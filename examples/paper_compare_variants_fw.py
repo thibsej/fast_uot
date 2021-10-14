@@ -242,7 +242,7 @@ if __name__ == '__main__':
     t_fw = np.median(np.array(time_fw))
     t_hfw = np.median(np.array(time_hfw))
     t_pfw = np.median(np.array(time_pfw))
-    plt.figure(figsize=(5, 4))
+    plt.figure(figsize=(8, 5))
     # plt.plot(norm_lfw, label='LFW')
     plt.plot(t_hfw * np.arange(len(norm_hfw)),  np.array(norm_hfw),
              label='$HFW$', c='r', linewidth=lw)
@@ -250,8 +250,8 @@ if __name__ == '__main__':
              label='$PFW$', c='g', linewidth=lw)
     plt.plot(t_fw * np.arange(len(norm_fw)),  np.array(norm_fw),
              label='$FW$', c='b', linewidth=lw)
-    plt.xlabel('$Time$', fontsize=16)
-    plt.ylabel('$\log_{10}\|f_t - f^*\|_\infty$', fontsize=16)
+    plt.xlabel('$Time$', fontsize=20)
+    plt.ylabel('$\log_{10}\|f_t - f^*\|_\infty$', fontsize=20)
     plt.legend(fontsize=10)
     plt.tight_layout()
     plt.savefig(path + f'plot_fw_comparison.pdf')

@@ -2,8 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-from fastuot.numpy_sinkhorn import sinkhorn_loop
-from fastuot.numpy_sinkhorn import homogeneous_loop as numpy_loop, faster_loop
+from fastuot.numpy_berg import sinkhorn_loop, homogeneous_loop, invariant_loop, \
+    rescale_berg
+from fastuot.uot1d import hilbert_norm, rescale_potentials
 
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
@@ -17,7 +18,7 @@ plt.rcParams.update(rc)
 
 
 def gauss(grid, mu, sig):
-    return np.exp(-0.5* ((grid-mu) / (sig))**2)
+    return np.exp(-0.5 * ((grid-mu) / sig) ** 2)
 
 
 def normalize(x):
@@ -45,16 +46,17 @@ if __name__ == '__main__':
     Nits_inf, Nits = 5000, 500
 
     scale = [10., 1., 0.1]
+    scale = [0.1, 0.2, 0.5]
     col = ['b', 'r', 'g', 'm']
     lw = 2.
-    plt.figure(figsize=(5, 4))
+    plt.figure(figsize=(8, 5))
     for p in range(len(scale)):
         epst, rhot = scale[p] * eps, scale[p] * rho
 
         # Compute reference
         fr, gr = np.zeros_like(a), np.zeros_like(b)
         for i in range(Nits_inf):
-            fr, gr = numpy_loop(fr, a, b, C, epst, rhot)
+            fr, gr = homogeneous_loop(fr, a, b, C, epst, rhot)
 
         # compute norm for sinkhorn
         f, g = np.zeros_like(a), np.zeros_like(b)
@@ -62,22 +64,25 @@ if __name__ == '__main__':
         for i in range(Nits):
             f, g = sinkhorn_loop(f, a, b, C, epst, rhot)
             err_sink.append(np.amax(np.abs(f - fr)))
+            # err_sink.append(hilbert_norm(f - fr))
+        plt.plot(np.log10(np.array(err_sink)), color=col[p],
+                 linestyle='dashed',
+                 label=f'$S,\,t=${scale[p]}', linewidth=lw)
 
         # compute norm for sinkhorn
         f, g = np.zeros_like(a), np.zeros_like(b)
         err_hom = []
         for i in range(Nits):
-            f, g = numpy_loop(f, a, b, C, epst, rhot)
+            f, g = invariant_loop(f, a, b, C, epst, rhot)
+            # t = rescale_berg(f, g, a, b, rhot)
             err_hom.append(np.amax(np.abs(f - fr)))
-
-        plt.plot(np.log10(np.array(err_sink)), color=col[p], linestyle='dashed',
-                 label=f'$S, t=${scale[p]}', linewidth=lw)
+            # err_hom.append(hilbert_norm(f - fr))
         plt.plot(np.log10(np.array(err_hom)), color=col[p],
-                 label=f'$TI, t=${scale[p]}', linewidth=lw)
+                 label=f'$TI,\,t=${scale[p]}', linewidth=lw)
 
-    plt.xlabel('$Iterations$', fontsize=16)
-    plt.ylabel('$\log_{10}\|f_t - f^*\|_\infty$', fontsize=16)
-    plt.legend(fontsize=9)
+    plt.xlabel('$Iterations$', fontsize=20)
+    plt.ylabel('$\log_{10}\|f_t - f^*\|_\infty$', fontsize=20)
+    plt.legend(fontsize=12)
     plt.tight_layout()
     plt.savefig(path + 'plot_sinkhorn_ratio_fixed.pdf')
     plt.show()

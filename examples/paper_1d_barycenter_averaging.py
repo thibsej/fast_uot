@@ -53,7 +53,7 @@ def generate_mixtures(K, nsampl, sig):
 if __name__ == '__main__':
     m = 1000  # size of the grid
     grid_pw = np.linspace(0, 1, m)
-    K = 10
+    K = 8
     nsampl = 500
     sig = .03
     np.random.seed(0)
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     lam = np.ones(K) / K
 
     # Plot input measures
-    plt.figure(figsize=(7, 6))
+    plt.figure(figsize=(8, 5))
     for k in range(K):
         plt.subplot(K, 1, k + 1)
         plt.fill_between(x[k], a[k], alpha=1)
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     # Compute balanced barycenter and plot
     I, P, y, f, cost = solve_balanced_barycenter(a, x, lam)
     b = parzen_window(y, P, grid=grid_pw)
-    plt.figure(figsize=(7, 6))
+    plt.figure(figsize=(8, 5))
     plt.fill_between(grid_pw, b, 'k')
     setup_axes(b)
     plt.tight_layout()
@@ -84,9 +84,9 @@ if __name__ == '__main__':
     # Compute unbalanced barycenter
     rho = .3
     Iu,Pu,yu,fu = solve_unbalanced_barycenter(a, x, lam, rho,
-                                              niter=500, verb=True)
+                                              niter=50, verb=True)
     ub = parzen_window(yu, Pu, grid=grid_pw)
-    plt.figure(figsize=(7, 6))
+    plt.figure(figsize=(8, 5))
     plt.plot(grid_pw, b, 'b:', label='$balanced$')
     plt.fill_between(grid_pw, ub, color='r', label='$unbalanced$')
     plt.legend(loc=9, fontsize=16)
