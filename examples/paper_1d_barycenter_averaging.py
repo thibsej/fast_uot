@@ -1,9 +1,7 @@
 import os
 
 import numpy as np
-from scipy.sparse import csr_matrix
 import matplotlib.pyplot as plt
-import progressbar
 
 from fastuot.uot1dbar import solve_unbalanced_barycenter, \
     solve_balanced_barycenter
@@ -11,9 +9,10 @@ from fastuot.uot1dbar import solve_unbalanced_barycenter, \
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
-path = path + "/paper/"
-if not os.path.isdir(path):
-    os.mkdir(path)
+if not os.path.isdir(path + "/paper/"):
+    os.mkdir(path + "/paper/")
+if not os.path.isdir(path + "/uot_barycenter/"):
+    os.mkdir(path + "/uot_barycenter/")
 
 rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True}
 plt.rcParams.update(rc)
@@ -32,7 +31,7 @@ def setup_axes(P):
 
 
 def gauss(t, mu, sig):
-    return np.exp(-(t-mu)**2/(2*sig**2))
+    return np.exp(-(t - mu) ** 2 / (2 * sig ** 2))
 
 
 def generate_mixtures(K, nsampl, sig):
@@ -51,28 +50,59 @@ def generate_mixtures(K, nsampl, sig):
 
 
 if __name__ == '__main__':
+    compute_data = True
+
     m = 1000  # size of the grid
     grid_pw = np.linspace(0, 1, m)
     K = 8
+    lam = np.ones(K) / K
     nsampl = 500
     sig = .03
+    rho = .3
+    niter_uot_fw = 1000
     np.random.seed(0)
 
-    a, x = generate_mixtures(K, nsampl, sig)
-    lam = np.ones(K) / K
+    ###########################################################################
+    # Generate data plots
+    ###########################################################################
+    if compute_data:
+        a, x = generate_mixtures(K, nsampl, sig)
+        for k in range(len(a)):
+            meas = np.zeros((2, nsampl))
+            meas[0], meas[1] = a[k], x[k]
+            np.save(path + "/uot_barycenter/" + f"input_measure_{k}.npy", meas)
+
+        I, P, y, f, _ = solve_balanced_barycenter(a, x, lam)
+        np.save(path + "/uot_barycenter/" + f"support_balanced_bar.npy", y)
+        np.save(path + "/uot_barycenter/" + f"weights_balanced_bar.npy", P)
+
+        # Compute unbalanced barycenter
+        Iu, Pu, yu, fu, cost = solve_unbalanced_barycenter(a, x, lam, rho,
+                                                           niter=niter_uot_fw,
+                                                           verb=True)
+        np.save(path + "/uot_barycenter/" + f"support_unbalanced_bar.npy", yu)
+        np.save(path + "/uot_barycenter/" + f"weights_unbalanced_bar.npy", Pu)
+        np.save(path + "/uot_barycenter/" + f"score_unbalanced_bar.npy",
+                np.array(cost))
+
+    ###########################################################################
+    # Make plots
+    ###########################################################################
 
     # Plot input measures
     plt.figure(figsize=(8, 5))
     for k in range(K):
+        meas = np.load(path + "/uot_barycenter/" + f"input_measure_{k}.npy")
         plt.subplot(K, 1, k + 1)
-        plt.fill_between(x[k], a[k], alpha=1)
-        setup_axes(a[k])
+        plt.fill_between(meas[1], meas[0], alpha=1)
+        setup_axes(meas[0])
     plt.tight_layout()
     plt.savefig(path + 'plot_inputs_barycenter.pdf', bbox_inches='tight')
     plt.show()
 
     # Compute balanced barycenter and plot
-    I, P, y, f, cost = solve_balanced_barycenter(a, x, lam)
+    y = np.load(path + "/uot_barycenter/" + f"support_balanced_bar.npy")
+    P = np.load(path + "/uot_barycenter/" + f"weights_balanced_bar.npy")
     b = parzen_window(y, P, grid=grid_pw)
     plt.figure(figsize=(8, 5))
     plt.fill_between(grid_pw, b, 'k')
@@ -82,9 +112,8 @@ if __name__ == '__main__':
     plt.show()
 
     # Compute unbalanced barycenter
-    rho = .3
-    Iu,Pu,yu,fu = solve_unbalanced_barycenter(a, x, lam, rho,
-                                              niter=50, verb=True)
+    yu = np.load(path + "/uot_barycenter/" + f"support_unbalanced_bar.npy")
+    Pu = np.load(path + "/uot_barycenter/" + f"weights_unbalanced_bar.npy")
     ub = parzen_window(yu, Pu, grid=grid_pw)
     plt.figure(figsize=(8, 5))
     plt.plot(grid_pw, b, 'b:', label='$balanced$')
@@ -95,5 +124,7 @@ if __name__ == '__main__':
     plt.savefig(path + 'plot_unbalanced_barycenter.pdf')
     plt.show()
 
-
-
+    # Plot dual score
+    cost = np.load(path + "/uot_barycenter/" + f"score_unbalanced_bar.npy")
+    plt.plot(cost[1:])
+    plt.show()

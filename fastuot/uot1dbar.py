@@ -179,6 +179,7 @@ def solve_unbalanced_barycenter(a, x, lam, rho, niter=100, verb=True):
     R = range(niter)
     if verb:
         R = progressbar.progressbar(R)
+    cost = []
     for it in R:
         # optimal translation
         A, c = np.zeros(K), np.zeros(K)
@@ -192,9 +193,15 @@ def solve_unbalanced_barycenter(a, x, lam, rho, niter=100, verb=True):
             a1[k] = a[k] * np.exp(-f[k] / (rho * lam[k]))
         # print(np.sum(a1[0]) , np.sum(a1[1]))
         # update dual potentials
-        I, P, y, fs, cost = solve_balanced_barycenter(a1, x, lam)
+        I, P, y, fs, _ = solve_balanced_barycenter(a1, x, lam)
         # F-W step
         gamma = 2 / (2 + it)  # fixed decaying weights
         for k in range(K):
             f[k] = (1 - gamma) * f[k] + gamma * fs[k]
-    return I, P, y, f
+        # Evaluate cost
+        c, summass = 1., 0.
+        for k in range(K):
+            c = c * np.sum(a[k] * np.exp(-f[k] / rho))**(1 / K)
+            summass = summass + rho * np.sum(a[k])
+        cost.append(summass-c)
+    return I, P, y, f, cost
