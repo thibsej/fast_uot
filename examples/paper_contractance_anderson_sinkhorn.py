@@ -1,0 +1,208 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+from fastuot.numpy_sinkhorn import sinkhorn_loop, faster_loop, homogeneous_loop
+from fastuot.uot1d import hilbert_norm, rescale_potentials
+
+path = os.getcwd() + "/output/"
+if not os.path.isdir(path):
+    os.mkdir(path)
+if not os.path.isdir(path + "/paper/"):
+    os.mkdir(path + "/paper/")
+if not os.path.isdir(path + "/rateanderson/"):
+    os.mkdir(path + "/rateanderson/")
+
+rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True,
+      'text.latex.preamble': [r'\usepackage{amsmath}', r'\usepackage{amssymb}']}
+plt.rcParams.update(rc)
+
+
+def gauss(grid, mu, sig):
+    return np.exp(-0.5 * ((grid-mu) / sig) ** 2)
+
+
+def normalize(x):
+    return x / np.sum(x)
+
+
+def generate_measure(N):
+    x = np.linspace(0.2, 0.4, num=N)
+    a = np.zeros_like(x)
+    a[:N//2] = 2.
+    a[N//2:] = 3.
+    y = np.linspace(0.45, 0.95, num=N)
+    a = normalize(a)
+    b = normalize(gauss(y, 0.6, 0.03)
+                  + gauss(y, 0.7, 0.03)
+                  + gauss(y, 0.8, 0.03))
+    return a, x, b, y
+
+
+def anderson_sinkhorn_loop(f, a, b, C, eps, rho, K=4, reg=1e-7):
+    U = np.zeros((K+1, f.shape[0]))
+    U[0] = f
+    for k in range(K):
+        f, g = sinkhorn_loop(f, a, b, C, eps, rho)
+        U[k + 1] = f
+    L = U[1:,:] - U[:-1,:]
+    L = L.dot(L.T)
+    c = np.linalg.solve(L + reg * np.eye(K), np.ones(K))
+    c = c / np.sum(c)
+    f = c.dot(U[:-1,:])
+    f, g = sinkhorn_loop(f, a, b, C, eps, rho)
+    return f, g
+
+
+def anderson_homogeneous_loop(f, a, b, C, eps, rho, K=4, reg=1e-7):
+    U = np.zeros((K+1, f.shape[0]))
+    U[0] = f
+    for k in range(K):
+        f, g = homogeneous_loop(f, a, b, C, eps, rho)
+        U[k + 1] = f
+    L = U[1:,:] - U[:-1,:]
+    L = L.dot(L.T)
+    c = np.linalg.solve(L + reg * np.eye(K), np.ones(K))
+    c = c / np.sum(c)
+    f = c.dot(U[:-1,:])
+    f, g = homogeneous_loop(f, a, b, C, eps, rho)
+    return f, g
+
+
+def anderson_faster_loop(f, a, b, C, eps, rho, K=4, reg=1e-7):
+    U = np.zeros((K+1, f.shape[0]))
+    U[0] = f
+    for k in range(K):
+        f, g = faster_loop(f, a, b, C, eps, rho)
+        U[k + 1] = f
+    L = U[1:,:] - U[:-1,:]
+    L = L.dot(L.T)
+    c = np.linalg.solve(L + reg * np.eye(K), np.ones(K))
+    c = c / np.sum(c)
+    f = c.dot(U[:-1,:])
+    f, g = faster_loop(f, a, b, C, eps, rho)
+    return f, g
+
+
+def run_error_loop(loop_func, fr, epst, rhot):
+    error = []
+    f, g = np.zeros_like(a), np.zeros_like(b)
+    for i in range(1000):
+        f, g = loop_func(f, a, b, C, epst, rhot)
+        t = 0.0
+        if loop_func in [faster_loop, anderson_faster_loop]:
+            t = rescale_potentials(f, g, a, b, rhot)
+        error.append(np.amax(np.abs(f + t - fr)))
+        if np.amax(np.abs(f + t - fr)) < 1e-12:
+            break
+    error = np.log10(np.array(error))
+    error = error[1:] - error[:-1]
+    # if loop_func in [anderson_faster_loop, anderson_sinkhorn_loop,
+    #                  anderson_homogeneous_loop]:
+    #     error = error / 4
+    return error
+
+
+
+if __name__ == '__main__':
+    compute_data = True
+
+    eps_l = [-1.]
+    N = 50
+    a, x, b, y = generate_measure(N)
+    C = (x[:, None] - y[None, :])**2
+    rho_scale = np.arange(-3., 3.5, 0.5)
+    list_loops = [sinkhorn_loop, homogeneous_loop, faster_loop,
+                  anderson_sinkhorn_loop, anderson_homogeneous_loop,
+                  anderson_faster_loop]
+
+
+    ###########################################################################
+    # Generate data plots
+    ###########################################################################
+    if compute_data:
+        np.save(path + "/rateanderson/" + f"rho_scale.npy", rho_scale)
+        for r in range(len(eps_l)):
+            epst = 10 ** eps_l[r]
+            rate_f, rate_g, rate_h = [], [], []
+            rate_andf, rate_andg, rate_andh = [], [], []
+            list_rates = [rate_f, rate_g, rate_h,
+                          rate_andf, rate_andg, rate_andh]
+            list_fnames = [f"rate_f_sinkhorn_kl_eps{epst}.npy",
+                           f"rate_g_sinkhorn_kl_eps{epst}.npy",
+                           f"rate_h_sinkhorn_kl_eps{epst}.npy",
+                           f"rate_andf_sinkhorn_kl_eps{epst}.npy",
+                           f"rate_andg_sinkhorn_kl_eps{epst}.npy",
+                           f"rate_andhf_sinkhorn_kl_eps{epst}.npy"]
+            for s in rho_scale:
+                rhot = 10**s
+                print(f"(eps, rho) = {(epst, rhot)}")
+
+                # Compute reference
+                fr, gr = np.zeros_like(a), np.zeros_like(b)
+                for i in range(50000):
+                    f_tmp = fr.copy()
+                    fr, gr = faster_loop(fr, a, b, C, epst, rhot)
+                    t = rescale_potentials(fr, gr, a, b, rhot)
+                    fr, gr = fr + t, gr - t
+                    if np.amax(np.abs(fr - f_tmp)) < 1e-15:
+                        break
+                print("computed reference.")
+
+                for loop_func, rate in zip(list_loops, list_rates):
+                    error = run_error_loop(loop_func, fr, epst, rhot)
+                    rate.append(np.median(error))
+
+            for rate, fname in zip(list_rates, list_fnames):
+                np.save(path + "/rateanderson/" + fname, rate)
+
+
+    ###########################################################################
+    # Make plots
+    ###########################################################################
+    p = 0.97
+    colors = ['cornflowerblue', 'indianred', 'mediumseagreen',
+              'cornflowerblue', 'indianred', 'mediumseagreen']
+    markers = ['x', 'o', 'v', 'x', 'o', 'v']
+    linestyles = ['dotted', 'dotted', 'dotted', 'dashed', 'dashed','dashed']
+    labels = ['$\mathcal{F}_{\epsilon}$', '$\mathcal{G}_{\epsilon}$',
+             '$\mathcal{H}_{\epsilon}$', '$\mathcal{F}_{\epsilon}$, And.',
+             '$\mathcal{G}_{\epsilon}$, And.',
+             '$\mathcal{H}_{\epsilon}$, And.']
+    markevery = 2
+    f, ax = plt.subplots(1, 1, figsize=(p * 5, p * 4))
+
+    rho_scale = 10 ** np.load(path + "/rateanderson/" + f"rho_scale.npy")
+
+    for r in range(len(eps_l)):
+        epst = 10 ** eps_l[r]
+        list_fnames = [f"rate_f_sinkhorn_kl_eps{epst}.npy",
+                       f"rate_g_sinkhorn_kl_eps{epst}.npy",
+                       f"rate_h_sinkhorn_kl_eps{epst}.npy",
+                       f"rate_andf_sinkhorn_kl_eps{epst}.npy",
+                       f"rate_andg_sinkhorn_kl_eps{epst}.npy",
+                       f"rate_andhf_sinkhorn_kl_eps{epst}.npy"]
+        list_rates = []
+        for fname in list_fnames:
+            list_rates.append(np.load(path + "/rateanderson/" + fname))
+
+        for r in range(len(list_fnames)):
+            ax.plot(rho_scale, 10 ** list_rates[r], c=colors[r],
+                    linestyle=linestyles[r],
+                     label=labels[r], marker=markers[r],
+                     markevery=markevery)
+
+    ax.legend(fontsize=11, ncol=2, columnspacing=0.5, handlelength=1.3,
+                   loc=(.02, .02))
+
+    ax.grid()
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.set_ylim([1e-6, 1.5])
+    ax.set_xlabel('Marginal parameter $\\rho$', fontsize=15)
+    ax.set_title('KL entropy', fontsize=18)
+    ax.set_ylabel('Contraction rate', fontsize=15)
+
+    plt.tight_layout()
+    plt.savefig(path + "/paper/" + 'plot_log_contraction_rate_anderson.pdf')
+    plt.show()

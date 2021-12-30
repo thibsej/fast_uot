@@ -12,7 +12,8 @@ path = path + "/paper/"
 if not os.path.isdir(path):
     os.mkdir(path)
 
-rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True}
+rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True,
+      'text.latex.preamble': [r'\usepackage{amsmath}', r'\usepackage{amssymb}']}
 plt.rcParams.update(rc)
 
 
@@ -86,14 +87,42 @@ if __name__ == '__main__':
     # params
     p = 2.
     rho = 0.1
-    niter = 4
+    niter = 2
+    # colors_a = ['lightcoral', 'indianred', 'firebrick', 'darkred']
+    # colors_b = ['cornflowerblue', 'steelblue', 'royalblue', 'mediumblue']
+    colors_a = ['darkred', 'firebrick', 'indianred', 'lightcoral']
+    colors_b = ['mediumblue', 'royalblue', 'steelblue', 'cornflowerblue']
+
+    plt.figure(figsize=(0.5 * 12, 0.5 * 5))
 
     fr, gr = np.zeros_like(a), np.zeros_like(b)
     for k in range(50000):
         fr, gr, Ar, Br = fw_step(fr, gr, a, b, rho, rho, k)
 
     f, g = np.zeros_like(a), np.zeros_like(b)
-    # _, _, _, f, g, _ = solve_ot(a, b, grid, grid, p)
+    plt.plot(grid, a, c=colors_a[0], label='input $\\alpha$')
+    plt.plot(grid, b, c=colors_b[0], label='input $\\beta$')
+    f, g, A, B = fw_step(f, g, a, b, rho, rho, 0)
     for k in range(niter):
-        f, g, A, B = fw_step(f, g, a, b, rho, rho, k)
-        plot_figstep(k)
+        print(k+1)
+        f, g, A, B = fw_step(f, g, a, b, rho, rho, k+1)
+        plt.plot(grid, A, c=colors_a[k+1],
+                 linestyle='dashed')
+        plt.plot(grid, B, c=colors_b[k+1],
+                 linestyle='dashed')
+
+    plt.plot(grid, Ar, c=colors_a[-1],
+             label='optimal $\\bar{\\alpha}$')
+    plt.plot(grid, Br, c=colors_b[-1],
+             label='optimal $\\bar{\\beta}$')
+
+    plt.ylim(0.0, 0.0065)
+    plt.xlim(0.15, 0.91)
+    plt.axis('off')
+    plt.legend(fontsize=12, ncol=2, columnspacing=0.5,
+                   handlelength=1.3)
+
+    plt.tight_layout()
+    plt.savefig(path + f'sequence_marginals_fw_onepic.pdf')
+    plt.show()
+

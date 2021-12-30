@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from fastuot.uot1d import solve_ot, rescale_potentials, invariant_dual_loss, \
-    homogeneous_line_search
+    homogeneous_line_search, solve_uot
 from fastuot.cvxpy_uot import dual_via_cvxpy
 
 path = os.getcwd() + "/output/"
@@ -19,7 +19,7 @@ if not os.path.isdir(path + "/variantfw/"):
 
 rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True}
 plt.rcParams.update(rc)
-lw =2
+
 
 
 def normalize(x):
@@ -58,23 +58,24 @@ def generate_measure(n, m):
 if __name__ == '__main__':
     compute_data = False
     np.random.seed(6)
-    n, m = 50, 50
+    n, m = 5000, 5001
     a, x, b, y = generate_random_measure(n, m)
+    # a, x, b, y = generate_measure(n, m)
 
     # params
     p = 1.5
-    rho = .05
-    niter = 2000
-    C = np.abs(x[:, None] - y[None, :]) ** p
+    rho = .1
+    niter = 10000
 
     ###########################################################################
     # Generate data plots
     ###########################################################################
     if compute_data:
-        result, constr, fr, gr = dual_via_cvxpy(a, b, x, y, p, rho,
-                                                cpsolv='ECOS',
-                                                tol=1e-10)
-        fr, gr = fr.value, gr.value
+        # result, constr, fr, gr = dual_via_cvxpy(a, b, x, y, p, rho,
+        #                                         cpsolv='SCS',
+        #                                         tol=1e-10)
+        # fr, gr = fr.value, gr.value
+        _, _, _, fr, _, _ = solve_uot(a, b, x, y, p, rho, niter=200000)
         np.save(path + "/variantfw/" + "ref_pot_cvxpy.npy", fr)
 
         #######################################################################
@@ -208,7 +209,8 @@ if __name__ == '__main__':
         np.save(path + "/variantfw/" + "err_pfw.npy",
                 np.array(norm_pfw))
 
-
+    lw = 1.5
+    colors = ['cornflowerblue', 'indianred', 'mediumseagreen']
 
     # Plot results
     time_arr = np.load(path + "/variantfw/" + "time_comput_fw.npy")
@@ -216,17 +218,19 @@ if __name__ == '__main__':
     err_fw = np.load(path + "/variantfw/" + "err_fw.npy")
     err_hfw = np.load(path + "/variantfw/" + "err_hfw.npy")
     err_pfw = np.load(path + "/variantfw/" + "err_pfw.npy")
-    plt.figure(figsize=(8, 5))
-    # plt.plot(norm_lfw, label='LFW')
-    plt.plot(t_hfw * np.arange(len(err_hfw)),  np.array(err_hfw),
-             label='$HFW$', c='r', linewidth=lw)
-    plt.plot(t_pfw * np.arange(len(err_pfw)),  np.array(err_pfw),
-             label='$PFW$', c='g', linewidth=lw)
-    plt.plot(t_fw * np.arange(len(err_fw)),  np.array(err_fw),
-             label='$FW$', c='b', linewidth=lw)
-    plt.xlabel('$Time$', fontsize=20)
-    plt.ylabel('$\log_{10}\|f_t - f^*\|_\infty$', fontsize=20)
-    plt.legend(fontsize=10)
+    plt.figure(figsize=(4, 2.5))
+    plt.plot(t_pfw * np.arange(1., len(err_pfw) + 1),  10**np.array(err_pfw),
+             label='PFW', c=colors[2], linewidth=lw)
+    plt.plot(t_hfw * np.arange(1., len(err_hfw) + 1),  10**np.array(err_hfw),
+             label='HFW', c=colors[1], linewidth=lw)
+    plt.plot(t_fw * np.arange(1., len(err_fw) + 1),  10**np.array(err_fw),
+             label='FW', c=colors[0], linewidth=lw)
+    plt.xlabel('Time', fontsize=15)
+    plt.grid()
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.ylabel('$\|f_t - f^*\|_\infty$', fontsize=15)
+    plt.legend(fontsize=11)
     plt.tight_layout()
     plt.savefig(path + "/paper/" + f'plot_fw_comparison.pdf')
     plt.show()
