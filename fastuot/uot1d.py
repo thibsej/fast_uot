@@ -143,13 +143,13 @@ def invariant_dual_loss(f, g, a, b, rho1, rho2=None):
 
 
 def hilbert_norm(f):
-    return np.amax(np.abs(f)) - np.amin(np.abs(f))
+    return np.amax(f) - np.amin(f)
 
 
 def primal_dual_gap(a, b, x, y, p, f, g, P, I, J, rho1, rho2=None):
     if rho2 is None:
         rho2 = rho1
-    prim = np.sum(P * np.abs(x[I] - y[J])**p)
+    prim = np.sum(P * np.abs(x[I] - y[J]) ** p)
     dual = np.sum(f * np.exp(-f / rho1) * a) \
            + np.sum(g * np.exp(-g / rho2) * b)
     return prim - dual
@@ -198,6 +198,7 @@ def solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-10,
     A, B = a * np.exp(-f / rho1), b * np.exp(-g / rho2)
     I, J, P, _, _, cost = solve_ot(A, B, x, y, p)
     return I, J, P, f, g, cost
+
 
 @jit(nopython=True)
 def pairwise_solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-10,
@@ -409,8 +410,8 @@ def lazy_potential(x, y, p, diagonal=True):
         if diagonal and (c22 < c12) and (c22 < c21):
             i += 1
             j += 1
-            f[i] = 0.5 * (c22 + c21 - c12 + f[i-1] - g[j-1])
-            g[j] = 0.5 * (c22 + c12 - c21 - f[i-1] + g[j-1])
+            f[i] = 0.5 * (c22 + c21 - c12 + f[i - 1] - g[j - 1])
+            g[j] = 0.5 * (c22 + c12 - c21 - f[i - 1] + g[j - 1])
         elif c12 > c21:
             i += 1
             f[i] = c21 - g[j]

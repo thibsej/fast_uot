@@ -13,7 +13,7 @@ def sinky(C, g, b, eps):
                              axis=1)
 
 def softmin(a, f, rho):
-    return - rho * logsumexp(np.log(a) - f /rho)
+    return - rho * logsumexp(np.log(a) - f / rho)
 
 
 def aprox(f, eps, rho):
@@ -57,6 +57,13 @@ def shift(f, g, a, b, C, eps, rho, rho2=None):
         for k in range(3):
             t = t + grad(t) / hess(t)
         return t
+
+def balanced_loop(f, a, b, C, eps):
+    # Update on G
+    g = sinkx(C, f, a, eps)
+    # Update on F
+    f = sinky(C, g, b, eps)
+    return f, g
 
 
 def sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):

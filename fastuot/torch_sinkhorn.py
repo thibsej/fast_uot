@@ -12,6 +12,9 @@ def sinky(C, g, b, eps):
 def aprox(f, eps, rho):
     return (1. / (1. + (eps / rho))) * f
 
+def softmin(a, f, rho):
+    return - rho * (a.log() - f / rho).logsumexp(dim=0)
+
 
 def dual_score_ent(f, g, a, b, C, eps, rho, rho2=None):
     if rho2 is None:
@@ -124,4 +127,13 @@ def full_loop(f, a, b, C, eps, rho, rho2=None):
     tr = rescale_potentials(f + ts, g + ts, a, b, rho, rho2)
     f, g = f + ts + tr, g + ts -tr
 
+    return f, g
+
+def faster_loop(f, a, b, C, eps, rho):
+    g = aprox(sinkx(C, f, a, eps), eps, rho) \
+        - 0.5 * (eps / (eps + rho)) * softmin(a, f, rho)
+    g = g + (eps / (eps + 2 * rho)) * softmin(b, g, rho)
+    f = aprox(sinky(C, g, b, eps), eps, rho) \
+        - 0.5 * (eps / (eps + rho)) * softmin(b, g, rho)
+    f = f + (eps / (eps + 2 * rho)) * softmin(a, f, rho)
     return f, g

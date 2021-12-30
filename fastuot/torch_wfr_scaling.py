@@ -19,6 +19,13 @@ def scaling_loop(A, B, Om, a, b):
     B = A_ * C[None,:]
     return A, B
 
+def solve_sqrt_ghk(a, x, b, y, niter):
+    Om = euclidean_conic_correlation(x, y)
+    A = Om.copy_()
+    B = Om.copy_()
+
+
+
 if __name__ == '__main__':
     import numpy as np
     import matplotlib.pyplot as plt
