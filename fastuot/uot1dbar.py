@@ -12,7 +12,7 @@ warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
 
 
-# @jit(nopython=True)
+@jit(nopython=True)
 def solve_balanced_barycenter(a, x, lam):
     """Computes the 1D Optimal Transport barycenters between several histograms.
 

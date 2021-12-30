@@ -407,11 +407,11 @@ def lazy_potential(x, y, p, diagonal=True):
         c21 = np.abs(x[i + 1] - y[j]) ** p
         if diagonal:
             c22 = np.abs(x[i + 1] - y[j + 1]) ** p
-        if diagonal and (c22 < c12) and (c22 < c21):
-            i += 1
-            j += 1
-            f[i] = 0.5 * (c22 + c21 - c12 + f[i - 1] - g[j - 1])
-            g[j] = 0.5 * (c22 + c12 - c21 - f[i - 1] + g[j - 1])
+            if (c22 < c12) and (c22 < c21):
+                i += 1
+                j += 1
+                f[i] = 0.5 * (c22 + c21 - c12 + f[i - 1] - g[j - 1])
+                g[j] = 0.5 * (c22 + c12 - c21 - f[i - 1] + g[j - 1])
         elif c12 > c21:
             i += 1
             f[i] = c21 - g[j]

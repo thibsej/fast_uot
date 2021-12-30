@@ -87,11 +87,11 @@ def hess_invariant(t, f, g, a, b, rho, rho2):
            - np.sum(b * hess_phis_berg(-g + t, rho2))
 
 
-def rescale_berg(f, g, a, b, rho, rho2=None):
+def rescale_berg(f, g, a, b, rho, rho2=None, nits=5):
     if rho2 is None:
         rho2 = rho
     t = 0.0
-    for k in range(5):
+    for k in range(nits):
         grad = grad_invariant(t, f, g, a, b, rho, rho2)
         hess = hess_invariant(t, f, g, a, b, rho, rho2)
         t = t - grad / hess
@@ -103,7 +103,7 @@ def rescale_berg(f, g, a, b, rho, rho2=None):
 ###############################################################################
 
 
-def sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
+def f_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
     if rho2 is None:
         rho2 = rho
     # Update on G
@@ -115,7 +115,7 @@ def sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
     return f, g
 
 
-def homogeneous_loop(f, a, b, C, eps, rho, rho2=None):
+def g_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
     if rho2 is None:
         rho2 = rho
     # Update on G
@@ -136,53 +136,75 @@ def homogeneous_loop(f, a, b, C, eps, rho, rho2=None):
 # H-Sinkhorn
 ###############################################################################
 
-
-def grad_const(k, f, a, mplan, eps, rho):
-    return np.sum(a * grad_phis_berg(-f - k, rho)) - np.exp(k / eps) * mplan
-
-
-def hess_const(k, f, a, mplan, eps, rho):
-    return - np.sum(a * hess_phis_berg(-f - k, rho)) \
-           - np.exp(k / eps) * mplan / eps
-
-
-def invariant_loop(f, a, b, C, eps, rho, rho2=None):
+def h_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None, nits=4):
     if rho2 is None:
         rho2 = rho
-
+    t = 0
     # Update on G
-    g = sinkx(C, f, a, eps)
-    g = -aprox_berg(-g, eps, rho2)
-    t, k = 0.0, 0.0
-    mplan = np.sum(a[:, None] * b[None, :]
-                   * np.exp((f[:, None] + g[None, :] - C) / eps))
-    for iter in range(5):
-        # Step on t
-        grad = grad_invariant(t, f, g + k, a, b, rho, rho2)
-        hess = hess_invariant(t, f, g + k, a, b, rho, rho2)
-        t = t - grad / hess
-
-        # Step on k
-        grad = grad_const(k, g - t, b, mplan, eps, rho2)
-        hess = hess_const(k, g - t, b, mplan, eps, rho2)
-        k = k + grad / hess
-    g = g + k
+    gs = sinkx(C, f, a, eps)
+    for it in range(nits):
+        g = -aprox_berg(-(gs - t), eps, rho2) + t
+        t = rescale_berg(f, g, a, b, rho, rho2, nits=nits)
+    g = -aprox_berg(-(gs - t), eps, rho2) + t
 
     # Update on F
-    f = sinky(C, g, b, eps)
-    f = -aprox_berg(-f, eps, rho)
-    t, k = 0.0, 0.0
-    mplan = np.sum(a[:, None] * b[None, :]
-                   * np.exp((f[:, None] + g[None, :] - C) / eps))
-    for iter in range(5):
-        # Step on t
-        grad = grad_invariant(t, f + k, g, a, b, rho, rho2)
-        hess = hess_invariant(t, f + k, g, a, b, rho, rho2)
-        t = t - grad / hess
-
-        # Step on k
-        grad = grad_const(k, f + t, a, mplan, eps, rho)
-        hess = hess_const(k, f + t, a, mplan, eps, rho)
-        k = k - grad / hess
-    f = f + k
+    fs = sinky(C, g, b, eps)
+    for it in range(nits):
+        f = -aprox_berg(-(fs + t), eps, rho2) - t
+        t = rescale_berg(f, g, a, b, rho, rho2, nits=nits)
+    f = -aprox_berg(-(fs + t), eps, rho2) - t
     return f, g
+
+###############################################################################
+# Deprecated code
+###############################################################################
+
+# def grad_const(k, f, a, mplan, eps, rho):
+#     return np.sum(a * grad_phis_berg(-f - k, rho)) - np.exp(k / eps) * mplan
+#
+#
+# def hess_const(k, f, a, mplan, eps, rho):
+#     return - np.sum(a * hess_phis_berg(-f - k, rho)) \
+#            - np.exp(k / eps) * mplan / eps
+#
+#
+# def invariant_loop(f, a, b, C, eps, rho, rho2=None):
+#     if rho2 is None:
+#         rho2 = rho
+#
+#     # Update on G
+#     g = sinkx(C, f, a, eps)
+#     g = -aprox_berg(-g, eps, rho2)
+#     t, k = 0.0, 0.0
+#     mplan = np.sum(a[:, None] * b[None, :]
+#                    * np.exp((f[:, None] + g[None, :] - C) / eps))
+#     for iter in range(5):
+#         # Step on t
+#         grad = grad_invariant(t, f, g + k, a, b, rho, rho2)
+#         hess = hess_invariant(t, f, g + k, a, b, rho, rho2)
+#         t = t - grad / hess
+#
+#         # Step on k
+#         grad = grad_const(k, g - t, b, mplan, eps, rho2)
+#         hess = hess_const(k, g - t, b, mplan, eps, rho2)
+#         k = k + grad / hess
+#     g = g + k
+#
+#     # Update on F
+#     f = sinky(C, g, b, eps)
+#     f = -aprox_berg(-f, eps, rho)
+#     t, k = 0.0, 0.0
+#     mplan = np.sum(a[:, None] * b[None, :]
+#                    * np.exp((f[:, None] + g[None, :] - C) / eps))
+#     for iter in range(5):
+#         # Step on t
+#         grad = grad_invariant(t, f + k, g, a, b, rho, rho2)
+#         hess = hess_invariant(t, f + k, g, a, b, rho, rho2)
+#         t = t - grad / hess
+#
+#         # Step on k
+#         grad = grad_const(k, f + t, a, mplan, eps, rho)
+#         hess = hess_const(k, f + t, a, mplan, eps, rho)
+#         k = k - grad / hess
+#     f = f + k
+#     return f, g
