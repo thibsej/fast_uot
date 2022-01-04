@@ -153,7 +153,11 @@ def h_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None, nits=4):
         f = -aprox_berg(-(fs + t), eps, rho2) - t
         t = rescale_berg(f, g, a, b, rho, rho2, nits=nits)
     f = -aprox_berg(-(fs + t), eps, rho2) - t
-    return f, g
+
+    # Update on lambda
+    t = rescale_berg(f, g, a, b, rho, rho2)
+
+    return f + t, g - t
 
 ###############################################################################
 # Deprecated code
