@@ -42,11 +42,8 @@ def generate_mixtures(K, nsampl, sig):
         x.append(t)
         u, v = .1 + .3 * np.random.rand(), .6 + .3 * np.random.rand()
         g, h = .8 + .2 * np.random.rand(), .8 + .2 * np.random.rand()
-        # g, h = 0.5, 0.5
         b = g * gauss(t, u, sig) + h * gauss(t, v, sig)
         a.append(b / np.sum(b))
-    # ref = gauss(t, 0.25, sig) + gauss(t, 0.75, sig)
-    # ref = ref / np.sum(ref)
     return a, x
 
 

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from fastuot.uot1d import solve_ot, rescale_potentials, invariant_dual_loss, \
     homogeneous_line_search, solve_uot
-from fastuot.cvxpy_uot import dual_via_cvxpy
+from utils_examples import normalize
 
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
@@ -21,19 +21,6 @@ rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True}
 plt.rcParams.update(rc)
 
 
-
-def normalize(x):
-    return x / np.sum(x)
-
-
-def gauss(grid, mu, sig):
-    return np.exp(-0.5 * ((grid-mu) / sig) ** 2)
-
-
-def hilbert_norm(f):
-    return np.amax(np.abs(f)) - np.amin(np.abs(f))
-
-
 def generate_random_measure(n, m):
     a = normalize(np.random.uniform(size=n))
     b = normalize(np.random.uniform(size=m))
@@ -42,25 +29,11 @@ def generate_random_measure(n, m):
     return a, x, b, y
 
 
-def generate_measure(n, m):
-    x = np.linspace(0.2, 0.4, num=n)
-    a = np.zeros_like(x)
-    a[:n // 2] = 2.
-    a[n // 2:] = 3.
-    y = np.linspace(0.45, 0.95, num=m)
-    a = normalize(a)
-    b = normalize(gauss(y, 0.6, 0.03)
-                  + gauss(y, 0.7, 0.03)
-                  + gauss(y, 0.8, 0.03))
-    return a, x, b, y
-
-
 if __name__ == '__main__':
     compute_data = False
     np.random.seed(6)
     n, m = 5000, 5001
     a, x, b, y = generate_random_measure(n, m)
-    # a, x, b, y = generate_measure(n, m)
 
     # params
     p = 1.5
@@ -71,12 +44,8 @@ if __name__ == '__main__':
     # Generate data plots
     ###########################################################################
     if compute_data:
-        # result, constr, fr, gr = dual_via_cvxpy(a, b, x, y, p, rho,
-        #                                         cpsolv='SCS',
-        #                                         tol=1e-10)
-        # fr, gr = fr.value, gr.value
         _, _, _, fr, _, _ = solve_uot(a, b, x, y, p, rho, niter=200000)
-        np.save(path + "/variantfw/" + "ref_pot_cvxpy.npy", fr)
+        np.save(path + "/variantfw/" + "ref_pot_maxiter.npy", fr)
 
         #######################################################################
         # Vanilla FW
@@ -132,7 +101,6 @@ if __name__ == '__main__':
 
             time_hfw.append(time.time() - t0)
             norm_hfw.append(np.log10(np.amax(np.abs(f - fr))))
-            # norm_hfw.append(np.log(hilbert_norm(f - fr)))
             dual_hfw.append(invariant_dual_loss(f, g, a, b, rho))
 
         #######################################################################
