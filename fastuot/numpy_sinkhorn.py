@@ -71,13 +71,17 @@ def g_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
 
 
 def h_sinkhorn_loop(f, a, b, C, eps, rho):
+    # TODO: take into account two different rho params
     g = aprox(sinkx(C, f, a, eps), eps, rho) \
         - 0.5 * (eps / (eps + rho)) * softmin(a, f, rho)
     g = g + (eps / (eps + 2 * rho)) * softmin(b, g, rho)
     f = aprox(sinky(C, g, b, eps), eps, rho) \
         - 0.5 * (eps / (eps + rho)) * softmin(b, g, rho)
     f = f + (eps / (eps + 2 * rho)) * softmin(a, f, rho)
-    return f, g
+
+    # Update on lambda
+    t = rescale_potentials(f, g, a, b, rho)
+    return f + t, g - t
 
 
 ###############################################################################
