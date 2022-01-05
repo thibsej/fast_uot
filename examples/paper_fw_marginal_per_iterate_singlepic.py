@@ -15,7 +15,7 @@ if not os.path.isdir(path):
 rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True,
       'text.latex.preamble': [r'\usepackage{amsmath}', r'\usepackage{amssymb}']}
 plt.rcParams.update(rc)
-
+# TODO: refactor with previous file
 
 def gauss(grid, mu, sig):
     return np.exp(-0.5* ((grid-mu) / (sig))**2)

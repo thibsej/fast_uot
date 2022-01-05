@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os
 
 from fastuot.numpy_berg import f_sinkhorn_loop, g_sinkhorn_loop, \
-    h_sinkhorn_loop, rescale_berg
+    h_sinkhorn_loop
 from utils_examples import generate_synthetic_measure
 
 path = os.getcwd() + "/output/"
@@ -61,6 +61,7 @@ if __name__ == '__main__':
                     if np.amax(np.abs(fr - f_tmp)) < 1e-15:
                         break
 
+                # Compute error and estimate rate
                 for k, (s, loop) in enumerate(zip(string_method, func_method)):
                     err = []
                     f, g = np.zeros_like(a), np.zeros_like(b)
@@ -131,13 +132,16 @@ if __name__ == '__main__':
         rate_g = np.load(path + "/rateberg/" + f"rate_g_sinkhorn_berg_eps{epst}.npy")
         rate_h = np.load(path + "/rateberg/" + f"rate_h_sinkhorn_berg_eps{epst}.npy")
         plt.plot(10**rho_scale, 10**rate_f, c=color, linestyle='dashed',
-                 label='$\mathcal{F}_{\epsilon}$', marker=markers[0],
+                 label='$\mathcal{F},\,\epsilon=$' + f' {epst}',
+                 marker=markers[0],
                      markevery=markevery)
         plt.plot(10**rho_scale, 10**rate_g, c=color,
-                 label='$\mathcal{G}_{\epsilon}$', marker=markers[1],
+                 label='$\mathcal{F},\,\epsilon=$' + f' {epst}',
+                 marker=markers[1],
                      markevery=markevery)
         plt.plot(10**rho_scale, 10**rate_h, c=color,
-                 label='$\mathcal{H}_{\epsilon}$', marker=markers[2],
+                 label='$\mathcal{F},\,\epsilon=$' + f' {epst}',
+                 marker=markers[2],
                      markevery=markevery)
     ax.set_xlabel('Marginal parameter $\\rho$', fontsize=15)
     ax.set_title('Berg entropy', fontsize=18)
