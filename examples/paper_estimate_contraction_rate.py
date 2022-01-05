@@ -12,7 +12,6 @@ if not os.path.isdir(path + "/paper/"):
 if not os.path.isdir(path + "/cvrate/"):
     os.mkdir(path + "/cvrate/")
 
-# TODO: refactor as in berg
 rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True,
       'text.latex.preamble': [r'\usepackage{amsmath}',
                               r'\usepackage{amssymb}']}
@@ -63,10 +62,6 @@ def load_wot_data():
     adata = wot.io.read_dataset(VAR_GENE_DS_PATH,
                                 obs=[CELL_DAYS_PATH, CELL_GROWTH_PATH],
                                 obs_filter=SERUM_CELL_IDS_PATH)
-    # print(adata.shape)
-    # print(type(adata))
-    # print(adata)
-    # print(adata.X[0])
     ot_model = wot.ot.OTModel(adata, epsilon=0.05, lambda1=1, lambda2=50)
     t0, t1 = 7, 8
     ds = ot_model.matrix
@@ -79,9 +74,6 @@ def load_wot_data():
     local_pca = ot_model.ot_config.pop('local_pca', None)
     eigenvals = None
     if local_pca is not None and local_pca > 0:
-        # pca, mean = wot.ot.get_pca(local_pca, p0.X, p1.X)
-        # p0_x = wot.ot.pca_transform(pca, mean, p0.X)
-        # p1_x = wot.ot.pca_transform(pca, mean, p1.X)
         p0_x, p1_x, pca, mean = wot.ot.compute_pca(p0.X, p1.X, local_pca)
         eigenvals = np.diag(pca.singular_values_)
     else:
@@ -100,7 +92,6 @@ if __name__ == '__main__':
     if penalty == 'kl':
         from fastuot.numpy_sinkhorn import f_sinkhorn_loop, g_sinkhorn_loop, \
             h_sinkhorn_loop
-        from fastuot.uot1d import rescale_potentials
     elif penalty == 'berg':
         from fastuot.numpy_berg import f_sinkhorn_loop, g_sinkhorn_loop, \
             h_sinkhorn_loop
@@ -140,8 +131,6 @@ if __name__ == '__main__':
                 for i in range(50000):
                     f_tmp = fr.copy()
                     fr, gr = h_sinkhorn_loop(fr, a, b, C, epst, rhot)
-                    # t = rescale_potentials(fr, gr, a, b, rhot)
-                    # fr, gr = fr + t, gr - t
                     if np.amax(np.abs(fr - f_tmp)) < 1e-15:
                         break
 
@@ -152,9 +141,6 @@ if __name__ == '__main__':
                     for i in range(2000):
                         f_tmp = f.copy()
                         f, g = loop(f, a, b, C, epst, rhot)
-                        # if s == 'h': # potential invariant for H-sinkhorn
-                        #     t = rescale_potentials(f, g, a, b, rhot)
-                        #     f, g = f + t, g - t
 
                         err.append(np.amax(np.abs(f - fr)))
                         if np.amax(np.abs(f - fr)) < 1e-12:
