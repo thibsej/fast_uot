@@ -72,6 +72,7 @@ def g_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
 
 def h_sinkhorn_loop(f, a, b, C, eps, rho):
     # TODO: take into account two different rho params
+    # TODO: Make a true invariant sinkhorn (and Berg)
     g = aprox(sinkx(C, f, a, eps), eps, rho) \
         - 0.5 * (eps / (eps + rho)) * softmin(a, f, rho)
     g = g + (eps / (eps + 2 * rho)) * softmin(b, g, rho)

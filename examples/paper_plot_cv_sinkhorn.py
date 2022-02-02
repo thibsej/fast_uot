@@ -4,6 +4,7 @@ import os
 
 from fastuot.numpy_berg import sinkhorn_loop, homogeneous_loop, invariant_loop, \
     rescale_berg
+from fastuot.uot1d import logsumexp
 from fastuot.uot1d import hilbert_norm, rescale_potentials
 
 path = os.getcwd() + "/output/"
@@ -54,6 +55,7 @@ if __name__ == '__main__':
         epst, rhot = scale[p] * eps, scale[p] * rho
 
         # Compute reference
+        # TODO: do more iterations and break if reach tol=1e-15
         fr, gr = np.zeros_like(a), np.zeros_like(b)
         for i in range(Nits_inf):
             fr, gr = homogeneous_loop(fr, a, b, C, epst, rhot)

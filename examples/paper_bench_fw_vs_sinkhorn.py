@@ -25,7 +25,7 @@ if not os.path.isdir(path + "/benchfw/"):
 
 
 
-
+# TODO: make plot with projected WOT data as well
 if __name__ == '__main__':
     compute_data = True
 

@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-
+# TODO: Update code with new refactored method and folder tree
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
