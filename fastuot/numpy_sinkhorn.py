@@ -53,35 +53,26 @@ def f_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
     return f, g
 
 
-def g_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
+def h_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
     if rho2 is None:
-        rho2 = rho
-    # Update on G
-    g = sinkx(C, f, a, eps)
-    g = aprox(g, eps, rho2)
-
-    # Update on F
-    f = sinky(C, g, b, eps)
-    f = aprox(f, eps, rho)
+        g = aprox(sinkx(C, f, a, eps), eps, rho) \
+            - 0.5 * (eps / (eps + rho)) * softmin(a, f, rho)
+        g = g + (eps / (eps + 2 * rho)) * softmin(b, g, rho)
+        f = aprox(sinky(C, g, b, eps), eps, rho) \
+            - 0.5 * (eps / (eps + rho)) * softmin(b, g, rho)
+        f = f + (eps / (eps + 2 * rho)) * softmin(a, f, rho)
+    else:
+        k1 = 1. / ((1. + (rho / eps)) * (1. + (rho2 / rho)))
+        k2 = 1. / ((1. + (rho2 / eps)) * (1. + (rho / rho2)))
+        xi1 = rho2 / (rho * (1. + (rho / eps) + (rho2 / eps)))
+        xi2 = rho / (rho2 * (1. + (rho / eps) + (rho2 / eps)))
+        g = aprox(sinkx(C, f, a, eps), eps, rho) - k2 * softmin(a, f, rho)
+        g = g + xi2 * softmin(b, rho2, g)
+        f = aprox(sinky(C, g, b, eps), eps, rho) - k1 * softmin(b, g, rho2)
+        f = f + xi1 * softmin(a, rho, f)
 
     # Update on lambda
     t = rescale_potentials(f, g, a, b, rho, rho2)
-
-    return f + t, g - t
-
-
-def h_sinkhorn_loop(f, a, b, C, eps, rho):
-    # TODO: take into account two different rho params
-    # TODO: Make a true invariant sinkhorn (and Berg)
-    g = aprox(sinkx(C, f, a, eps), eps, rho) \
-        - 0.5 * (eps / (eps + rho)) * softmin(a, f, rho)
-    g = g + (eps / (eps + 2 * rho)) * softmin(b, g, rho)
-    f = aprox(sinky(C, g, b, eps), eps, rho) \
-        - 0.5 * (eps / (eps + rho)) * softmin(b, g, rho)
-    f = f + (eps / (eps + 2 * rho)) * softmin(a, f, rho)
-
-    # Update on lambda
-    t = rescale_potentials(f, g, a, b, rho)
     return f + t, g - t
 
 
@@ -195,3 +186,19 @@ def h_sinkhorn_loop(f, a, b, C, eps, rho):
 #     u = u * t
 #
 #     return u, v
+
+# def g_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
+#     if rho2 is None:
+#         rho2 = rho
+#     # Update on G
+#     g = sinkx(C, f, a, eps)
+#     g = aprox(g, eps, rho2)
+#
+#     # Update on F
+#     f = sinky(C, g, b, eps)
+#     f = aprox(f, eps, rho)
+#
+#     # Update on lambda
+#     t = rescale_potentials(f, g, a, b, rho, rho2)
+#
+#     return f + t, g - t

@@ -115,21 +115,7 @@ def f_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
     return f, g
 
 
-def g_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
-    if rho2 is None:
-        rho2 = rho
-    # Update on G
-    g = sinkx(C, f, a, eps)
-    g = -aprox_berg(-g, eps, rho2)
 
-    # Update on F
-    f = sinky(C, g, b, eps)
-    f = -aprox_berg(-f, eps, rho)
-
-    # Update on lambda
-    t = rescale_berg(f, g, a, b, rho, rho2)
-
-    return f + t, g - t
 
 
 ###############################################################################
@@ -150,9 +136,9 @@ def h_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None, nits=4):
     # Update on F
     fs = sinky(C, g, b, eps)
     for it in range(nits):
-        f = -aprox_berg(-(fs + t), eps, rho2) - t
+        f = -aprox_berg(-(fs + t), eps, rho) - t
         t = rescale_berg(f, g, a, b, rho, rho2, nits=nits)
-    f = -aprox_berg(-(fs + t), eps, rho2) - t
+    f = -aprox_berg(-(fs + t), eps, rho) - t
 
     # Update on lambda
     t = rescale_berg(f, g, a, b, rho, rho2)
@@ -212,3 +198,19 @@ def h_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None, nits=4):
 #         k = k - grad / hess
 #     f = f + k
 #     return f, g
+
+# def g_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
+#     if rho2 is None:
+#         rho2 = rho
+#     # Update on G
+#     g = sinkx(C, f, a, eps)
+#     g = -aprox_berg(-g, eps, rho2)
+#
+#     # Update on F
+#     f = sinky(C, g, b, eps)
+#     f = -aprox_berg(-f, eps, rho)
+#
+#     # Update on lambda
+#     t = rescale_berg(f, g, a, b, rho, rho2)
+#
+#     return f + t, g - t
