@@ -18,16 +18,15 @@ assert torch.cuda.is_available()
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
-if not os.path.isdir(path + "/paper/"):
-    os.mkdir(path + "/paper/")
-if not os.path.isdir(path + "/benchfw/"):
-    os.mkdir(path + "/benchfw/")
+path = path + 'benchfwsink/'
+if not os.path.isdir(path):
+    os.mkdir(path)
 
 
 
 # TODO: make plot with projected WOT data as well
 if __name__ == '__main__':
-    compute_data = True
+    compute_data = False
 
     rho = 1.
     p = 2.
@@ -44,8 +43,8 @@ if __name__ == '__main__':
     ###########################################################################
     if compute_data:
         # Compute unregularized exact dual potential as reference
-        _, _, _, fr, _, _ = solve_uot(a, b, x, y, p, rho, niter=200000)
-        np.save(path + "/benchfw/" + "ref_pot_maxiter.npy", fr)
+        _, _, _, fr, _, _ = solve_uot(a, b, x, y, p, rho, niter=20000)
+        np.save(path + "ref_pot_maxiter.npy", fr)
         print("Computed reference potential")
 
         #######################################################################
@@ -69,8 +68,8 @@ if __name__ == '__main__':
             f, g = f + transl, g - transl
             time_fw.append(time.time() - t0)
             acc_fw.append(np.amax(np.abs(f - fr)))
-        np.save(path + "/benchfw/" + f"time_fw.npy", np.array(time_fw))
-        np.save(path + "/benchfw/" + f"err_fw.npy", np.array(acc_fw))
+        np.save(path + f"time_fw.npy", np.array(time_fw))
+        np.save(path + f"err_fw.npy", np.array(acc_fw))
 
         #######################################################################
         # Bench Sinkhorn GPU
@@ -93,9 +92,9 @@ if __name__ == '__main__':
                 time_sink.append(time.time() - t0)
                 transl = translate_pot(ft, gt, at, bt, rho, rho)
                 acc_sink.append((ft + transl - frt).abs().max().data.item())
-            np.save(path + "/benchfw/" + f"time_sink_eps{list_eps[j]}.npy",
+            np.save(path + f"time_sink_eps{list_eps[j]}.npy",
                     np.array(time_sink))
-            np.save(path + "/benchfw/" + f"err_sink_eps{list_eps[j]}.npy",
+            np.save(path + f"err_sink_eps{list_eps[j]}.npy",
                     np.array(acc_sink))
 
     ###########################################################################
@@ -103,22 +102,21 @@ if __name__ == '__main__':
     ###########################################################################
     # Compute median time of loop for rescaling x-axis
     list_time = []
-    list_time.append(np.median(np.load(path + "/benchfw/" + f"time_fw.npy")))
+    list_time.append(np.median(np.load(path + f"time_fw.npy")))
     for j in range(len(list_eps)):
         list_time.append(np.median(
-            np.load(path + "/benchfw/" + f"time_sink_eps{list_eps[j]}.npy")))
+            np.load(path + f"time_sink_eps{list_eps[j]}.npy")))
 
     # Aggregating all convergence accuracies and plotting
     list_acc = []
-    list_acc.append(np.load(path + "/benchfw/" + f"err_fw.npy"))
+    list_acc.append(np.load(path + f"err_fw.npy"))
     for j in range(len(list_eps)):
         list_acc.append(
-            np.load(path + "/benchfw/" + f"err_sink_eps{list_eps[j]}.npy"))
+            np.load(path + f"err_sink_eps{list_eps[j]}.npy"))
 
-    colors = ['cornflowerblue', 'mediumseagreen', 'lightcoral', 'indianred',
-              'firebrick']
+    colors = ['cornflowerblue', 'lightcoral', 'indianred', 'firebrick']
     labels = ['FW'] \
-             + [r'$\mathcal{H}_{\varepsilon}$, $\log\varepsilon$='+str(x) for x in list_eps]
+             + [r'TI, $\log\varepsilon$='+str(x) for x in list_eps]
 
     plt.figure(figsize=(4, 2.5))
     for k in range(len(list_time)):
@@ -131,10 +129,10 @@ if __name__ == '__main__':
     plt.xscale('log')
     plt.grid()
     plt.legend(fontsize=9, ncol=2, handlelength=1.3, columnspacing=0.5,
-               loc=(0.21, 0.2))
+               loc=(0.01, 0.01))
     # plt.legend(fontsize=9, ncol=2, handlelength=1.3, columnspacing=0.5,
     #            loc=(0.01, 0.01))
     plt.tight_layout()
-    plt.savefig(path + "/paper/" + 'plot_bench_fw_sink+0.pdf')
+    plt.savefig(path + 'plot_bench_fw_sink+0.pdf')
     plt.show()
 

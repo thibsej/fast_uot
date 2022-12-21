@@ -2,18 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-from fastuot.numpy_sinkhorn import f_sinkhorn_loop, g_sinkhorn_loop, \
-    h_sinkhorn_loop
+from fastuot.numpy_sinkhorn import f_sinkhorn_loop, h_sinkhorn_loop
 from fastuot.uot1d import rescale_potentials
 from utils_examples import generate_synthetic_measure
 
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
-if not os.path.isdir(path + "/paper/"):
-    os.mkdir(path + "/paper/")
-if not os.path.isdir(path + "/rateanderson/"):
-    os.mkdir(path + "/rateanderson/")
+path = path + 'rateanderson/'
+if not os.path.isdir(path):
+    os.mkdir(path)
 
 rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True,
       'text.latex.preamble': [r'\usepackage{amsmath}',
@@ -33,21 +31,6 @@ def anderson_f_sinkhorn_loop(f, a, b, C, eps, rho, K=4, reg=1e-7):
     c = c / np.sum(c)
     f = c.dot(U[:-1, :])
     f, g = f_sinkhorn_loop(f, a, b, C, eps, rho)
-    return f, g
-
-
-def anderson_g_sinkhorn_loop(f, a, b, C, eps, rho, K=4, reg=1e-7):
-    U = np.zeros((K + 1, f.shape[0]))
-    U[0] = f
-    for k in range(K):
-        f, g = g_sinkhorn_loop(f, a, b, C, eps, rho)
-        U[k + 1] = f
-    L = U[1:, :] - U[:-1, :]
-    L = L.dot(L.T)
-    c = np.linalg.solve(L + reg * np.eye(K), np.ones(K))
-    c = c / np.sum(c)
-    f = c.dot(U[:-1, :])
-    f, g = g_sinkhorn_loop(f, a, b, C, eps, rho)
     return f, g
 
 
@@ -83,22 +66,21 @@ def run_error_loop(loop_func, fr, epst, rhot):
 
 
 if __name__ == '__main__':
-    compute_data = True
+    compute_data = False
 
     eps_l = [-1.]
     N = 50
     a, x, b, y = generate_synthetic_measure(N, N)
     C = (x[:, None] - y[None, :]) ** 2
     rho_scale = np.arange(-3., 3.5, 0.5)
-    list_loops = [f_sinkhorn_loop, g_sinkhorn_loop, h_sinkhorn_loop,
-                  anderson_f_sinkhorn_loop, anderson_g_sinkhorn_loop,
-                  anderson_h_sinkhorn_loop]
+    list_loops = [f_sinkhorn_loop, h_sinkhorn_loop,
+                  anderson_f_sinkhorn_loop, anderson_h_sinkhorn_loop]
 
     ###########################################################################
     # Generate data plots
     ###########################################################################
     if compute_data:
-        np.save(path + "/rateanderson/" + f"rho_scale.npy", rho_scale)
+        np.save(path + f"rho_scale.npy", rho_scale)
         for r in range(len(eps_l)):
             epst = 10 ** eps_l[r]
             rate_f, rate_g, rate_h = [], [], []
@@ -106,10 +88,8 @@ if __name__ == '__main__':
             list_rates = [rate_f, rate_g, rate_h,
                           rate_andf, rate_andg, rate_andh]
             list_fnames = [f"rate_f_sinkhorn_kl_eps{epst}.npy",
-                           f"rate_g_sinkhorn_kl_eps{epst}.npy",
                            f"rate_h_sinkhorn_kl_eps{epst}.npy",
                            f"rate_andf_sinkhorn_kl_eps{epst}.npy",
-                           f"rate_andg_sinkhorn_kl_eps{epst}.npy",
                            f"rate_andhf_sinkhorn_kl_eps{epst}.npy"]
             for s in rho_scale:
                 rhot = 10 ** s
@@ -131,36 +111,33 @@ if __name__ == '__main__':
                     rate.append(np.median(error))
 
             for rate, fname in zip(list_rates, list_fnames):
-                np.save(path + "/rateanderson/" + fname, rate)
+                np.save(path + fname, rate)
 
     ###########################################################################
     # Make plots
     ###########################################################################
     p = 0.97
-    colors = ['cornflowerblue', 'indianred', 'mediumseagreen',
-              'cornflowerblue', 'indianred', 'mediumseagreen']
-    markers = ['x', 'o', 'v', 'x', 'o', 'v']
-    linestyles = ['dotted', 'dotted', 'dotted', 'dashed', 'dashed', 'dashed']
-    labels = ['$\mathcal{F}_{\epsilon}$', '$\mathcal{G}_{\epsilon}$',
-              '$\mathcal{H}_{\epsilon}$', '$\mathcal{F}_{\epsilon}$, And.',
-              '$\mathcal{G}_{\epsilon}$, And.',
-              '$\mathcal{H}_{\epsilon}$, And.']
+    colors = ['cornflowerblue', 'indianred',
+              'cornflowerblue', 'indianred']
+    markers = ['x', 'v', 'x', 'v']
+    linestyles = ['dotted', 'dotted', 'dashed', 'dashed']
+    labels = ['S',
+              'TI', 'S, And.',
+              'TI, And.']
     markevery = 2
     f, ax = plt.subplots(1, 1, figsize=(p * 5, p * 4))
 
-    rho_scale = 10 ** np.load(path + "/rateanderson/" + f"rho_scale.npy")
+    rho_scale = 10 ** np.load(path + f"rho_scale.npy")
 
     for r in range(len(eps_l)):
         epst = 10 ** eps_l[r]
         list_fnames = [f"rate_f_sinkhorn_kl_eps{epst}.npy",
-                       f"rate_g_sinkhorn_kl_eps{epst}.npy",
                        f"rate_h_sinkhorn_kl_eps{epst}.npy",
                        f"rate_andf_sinkhorn_kl_eps{epst}.npy",
-                       f"rate_andg_sinkhorn_kl_eps{epst}.npy",
                        f"rate_andhf_sinkhorn_kl_eps{epst}.npy"]
         list_rates = []
         for fname in list_fnames:
-            list_rates.append(np.load(path + "/rateanderson/" + fname))
+            list_rates.append(np.load(path + fname))
 
         for r in range(len(list_fnames)):
             ax.plot(rho_scale, 10 ** list_rates[r], c=colors[r],
@@ -168,17 +145,17 @@ if __name__ == '__main__':
                     label=labels[r], marker=markers[r],
                     markevery=markevery)
 
-    ax.legend(fontsize=11, ncol=2, columnspacing=0.5, handlelength=1.3,
+    ax.legend(fontsize=11, ncol=2, columnspacing=0.5, handlelength=2.,
               loc=(.02, .02))
 
     ax.grid()
     ax.set_yscale('log')
     ax.set_xscale('log')
     ax.set_ylim([1e-6, 1.5])
-    ax.set_xlabel('Marginal parameter $\\rho$', fontsize=15)
-    ax.set_title('KL entropy', fontsize=18)
-    ax.set_ylabel('Contraction rate', fontsize=15)
+    ax.set_xlabel('Marginal parameter $\\rho$', fontsize=18)
+    ax.set_title('KL entropy', fontsize=22)
+    ax.set_ylabel('Contraction rate', fontsize=18)
 
     plt.tight_layout()
-    plt.savefig(path + "/paper/" + 'plot_log_contraction_rate_anderson.pdf')
+    plt.savefig(path + 'plot_log_contraction_rate_anderson.pdf')
     plt.show()

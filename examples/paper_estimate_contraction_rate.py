@@ -1,3 +1,8 @@
+"""
+NB: Data for the WOT package can be downloaded at https://drive.google.com/open?id=1E494DhIx5RLy0qv_6eWa9426Bfmq28po
+See https://broadinstitute.github.io/wot/tutorial/ for more details
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -7,10 +12,9 @@ from utils_examples import generate_synthetic_measure
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
-if not os.path.isdir(path + "/paper/"):
-    os.mkdir(path + "/paper/")
-if not os.path.isdir(path + "/cvrate/"):
-    os.mkdir(path + "/cvrate/")
+path = path + "cvrate/"
+if not os.path.isdir(path):
+    os.mkdir(path)
 
 rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True,
       'text.latex.preamble': [r'\usepackage{amsmath}',
@@ -83,18 +87,17 @@ def load_wot_data():
     a, b = np.ones(C.shape[0]) / C.shape[0], np.ones(C.shape[1]) / C.shape[1]
     return a, b, C
 
+
 if __name__ == '__main__':
-    compute_data = True # If false then load precomputed results and plots
-    wot_data = False # If true uses the WOT package biological data
+    compute_data = False # If false then load precomputed results and plots
+    wot_data = True # If true uses the WOT package biological data
     
     marginal_penalty_l = ['kl', 'berg']
     penalty = marginal_penalty_l[0]
     if penalty == 'kl':
-        from fastuot.numpy_sinkhorn import f_sinkhorn_loop, g_sinkhorn_loop, \
-            h_sinkhorn_loop
+        from fastuot.numpy_sinkhorn import f_sinkhorn_loop, h_sinkhorn_loop
     elif penalty == 'berg':
-        from fastuot.numpy_berg import f_sinkhorn_loop, g_sinkhorn_loop, \
-            h_sinkhorn_loop
+        from fastuot.numpy_berg import f_sinkhorn_loop, h_sinkhorn_loop
     else:
         raise Exception('Only accepted penalties are KL and Berg.')
     
@@ -109,16 +112,16 @@ if __name__ == '__main__':
         dataname = 'synth'
     
     # Grid of parameters for Sinkhorn algorithm
-    eps_l = [-1., 0.]
-    rho_scale = np.arange(-3., 3.5, 0.5)
-    string_method = ['f', 'g', 'h']
-    func_method = [f_sinkhorn_loop, g_sinkhorn_loop, h_sinkhorn_loop]
+    eps_l = [np.log10(0.1), np.log10(0.5)]
+    rho_scale = np.arange(-3., 2.5, 0.5)
+    string_method = ['f', 'h']
+    func_method = [f_sinkhorn_loop, h_sinkhorn_loop]
 
     ###########################################################################
     # Generate data plots
     ###########################################################################
     if compute_data:
-        np.save(path + "/cvrate/" + f"rho_scale.npy", rho_scale)
+        np.save(path + f"rho_scale.npy", rho_scale)
         for r in range(len(eps_l)):
             epst = 10 ** eps_l[r]
             rate = [[], [], []]
@@ -128,22 +131,24 @@ if __name__ == '__main__':
 
                 # Compute reference
                 fr, gr = np.zeros_like(a), np.zeros_like(b)
-                for i in range(50000):
+                for i in range(100):
                     f_tmp = fr.copy()
                     fr, gr = h_sinkhorn_loop(fr, a, b, C, epst, rhot)
+                    fr, gr = f_sinkhorn_loop(fr, a, b, C, epst, rhot)
                     if np.amax(np.abs(fr - f_tmp)) < 1e-15:
                         break
+                print(f"     Estimated fixed point: Iter {i}")
 
                 # Compute error and estimate rate
                 for k, (s, loop) in enumerate(zip(string_method, func_method)):
                     err = []
                     f, g = np.zeros_like(a), np.zeros_like(b)
-                    for i in range(2000):
+                    for i in range(50):
                         f_tmp = f.copy()
                         f, g = loop(f, a, b, C, epst, rhot)
 
                         err.append(np.amax(np.abs(f - fr)))
-                        if np.amax(np.abs(f - fr)) < 1e-12:
+                        if np.amax(np.abs(f - fr)) < 1e-13:
                             break
                     err = np.log10(np.array(err))
                     err = err[1:] - err[:-1]
@@ -151,47 +156,46 @@ if __name__ == '__main__':
 
             for k, (s, loop) in enumerate(zip(string_method, func_method)):
                 np.save(
-                    path + "/cvrate/" + "rate_" + s + f"_sinkhorn_{penalty}_eps{epst}_{dataname}.npy",
+                    path + "rate_" + s + f"_sinkhorn_{penalty}_eps{epst}_{dataname}.npy",
                     np.array(rate[k]))
-
 
     ###########################################################################
     # Make plots
     ###########################################################################
-    p = 0.97
+    p = 0.9
     colors = ['cornflowerblue', 'indianred']
-    markers = ['x', 'o', 'v']
-    linestyles = ['dotted', 'dashed', 'solid']
-    labels = ['$\mathcal{F},\,\epsilon=$', '$\mathcal{G},\,\epsilon=$',
-              '$\mathcal{H},\,\epsilon=$']
+    markers = ['x', 'o']
+    linestyles = ['dotted', 'dashed']
+    labels = ['S, ' + '$\\varepsilon=$', 'TI, ' + '$\\varepsilon=$']
     markevery = 2
     f, ax = plt.subplots(1, 1, figsize=(p * 5, p * 4))
 
-    rho_scale = 10 ** np.load(path + "/cvrate/" + f"rho_scale.npy")
+    rho_scale = 10 ** np.load(path + f"rho_scale.npy")
 
-    for logeps, color in zip(eps_l, colors):
+    for logeps, color, marker in zip(eps_l, colors, markers):
         epst = 10 ** logeps
-        for marker, linestyle, label, s in zip(markers, linestyles, labels, string_method):
+        for linestyle, label, s in zip(linestyles, labels, string_method):
             rate_f = np.load(
-                path + "/cvrate/" + f"rate_" + s + f"_sinkhorn_{penalty}_eps{epst}_{dataname}.npy")
+                path + f"rate_" + s + f"_sinkhorn_{penalty}_eps{epst}_{dataname}.npy")
             ax.plot(rho_scale, 10 ** rate_f, c=color, linestyle=linestyle,
-                    label=label + f' {epst}',
+                    label=label + f' {np.around(epst, decimals=1)}',
                     marker=marker, markevery=markevery)
 
-    ax.legend(fontsize=11, ncol=2, columnspacing=0.5, handlelength=1.3,
-              loc=(.4, .02))
+    ax.legend(fontsize=11, ncol=2, columnspacing=0.5, handlelength=2.,
+              loc=(.28, .02))
+              # loc=(.42, .02))
 
     ax.grid()
     ax.set_yscale('log')
     ax.set_xscale('log')
     ax.set_ylim([1e-6, 1.5])
-    ax.set_xlabel('Marginal parameter $\\rho$', fontsize=15)
+    ax.set_xlabel('Marginal parameter $\\rho$', fontsize=18)
     if penalty == 'kl':
-        ax.set_title('KL entropy', fontsize=18)
+        ax.set_title('KL entropy', fontsize=22)
     if penalty == 'berg':
-        ax.set_title('Berg entropy', fontsize=18)
-    ax.set_ylabel('Contraction rate', fontsize=15)
+        ax.set_title('Berg entropy', fontsize=22)
+    ax.set_ylabel('Contraction rate', fontsize=18)
 
     plt.tight_layout()
-    plt.savefig(path + "/paper/" + f'plot_log_contraction_rate_{penalty}_{dataname}.pdf')
+    plt.savefig(path + f'plot_log_contraction_rate_{penalty}_{dataname}.pdf')
     plt.show()

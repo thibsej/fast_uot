@@ -11,10 +11,9 @@ from utils_examples import normalize
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
-if not os.path.isdir(path + "/paper/"):
-    os.mkdir(path + "/paper/")
-if not os.path.isdir(path + "/variantfw/"):
-    os.mkdir(path + "/variantfw/")
+path = path + 'variantfw/'
+if not os.path.isdir(path):
+    os.mkdir(path)
 
 
 rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True}
@@ -45,7 +44,7 @@ if __name__ == '__main__':
     ###########################################################################
     if compute_data:
         _, _, _, fr, _, _ = solve_uot(a, b, x, y, p, rho, niter=200000)
-        np.save(path + "/variantfw/" + "ref_pot_maxiter.npy", fr)
+        np.save(path + "ref_pot_maxiter.npy", fr)
 
         #######################################################################
         # Vanilla FW
@@ -168,29 +167,29 @@ if __name__ == '__main__':
         t_fw = np.median(np.array(time_fw))
         t_hfw = np.median(np.array(time_hfw))
         t_pfw = np.median(np.array(time_pfw))
-        np.save(path + "/variantfw/" + "time_comput_fw.npy",
+        np.save(path + "time_comput_fw.npy",
                 np.array([t_fw, t_hfw, t_pfw]))
-        np.save(path + "/variantfw/" + "err_fw.npy",
+        np.save(path + "err_fw.npy",
                 np.array(norm_fw))
-        np.save(path + "/variantfw/" + "err_hfw.npy",
+        np.save(path + "err_hfw.npy",
                 np.array(norm_hfw))
-        np.save(path + "/variantfw/" + "err_pfw.npy",
+        np.save(path + "err_pfw.npy",
                 np.array(norm_pfw))
 
     lw = 1.5
     colors = ['cornflowerblue', 'indianred', 'mediumseagreen']
 
     # Plot results
-    time_arr = np.load(path + "/variantfw/" + "time_comput_fw.npy")
+    time_arr = np.load(path + "time_comput_fw.npy")
     t_fw, t_hfw, t_pfw = time_arr[0], time_arr[1], time_arr[2]
-    err_fw = np.load(path + "/variantfw/" + "err_fw.npy")
-    err_hfw = np.load(path + "/variantfw/" + "err_hfw.npy")
-    err_pfw = np.load(path + "/variantfw/" + "err_pfw.npy")
+    err_fw = np.load(path + "err_fw.npy")
+    err_hfw = np.load(path + "err_hfw.npy")
+    err_pfw = np.load(path + "err_pfw.npy")
     plt.figure(figsize=(4, 2.5))
     plt.plot(t_pfw * np.arange(1., len(err_pfw) + 1),  10**np.array(err_pfw),
              label='PFW', c=colors[2], linewidth=lw)
     plt.plot(t_hfw * np.arange(1., len(err_hfw) + 1),  10**np.array(err_hfw),
-             label='HFW', c=colors[1], linewidth=lw)
+             label='LFW', c=colors[1], linewidth=lw)
     plt.plot(t_fw * np.arange(1., len(err_fw) + 1),  10**np.array(err_fw),
              label='FW', c=colors[0], linewidth=lw)
     plt.xlabel('Time', fontsize=15)
@@ -200,5 +199,5 @@ if __name__ == '__main__':
     plt.ylabel('$\|f_t - f^*\|_\infty$', fontsize=15)
     plt.legend(fontsize=11)
     plt.tight_layout()
-    plt.savefig(path + "/paper/" + f'plot_fw_comparison.pdf')
+    plt.savefig(path + f'plot_fw_comparison.pdf')
     plt.show()

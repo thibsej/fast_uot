@@ -2,89 +2,102 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-from fastuot.numpy_berg import sinkhorn_loop, homogeneous_loop, invariant_loop, \
-    rescale_berg
+from fastuot.numpy_sinkhorn import f_sinkhorn_loop, h_sinkhorn_loop
 from fastuot.uot1d import logsumexp
 from fastuot.uot1d import hilbert_norm, rescale_potentials
+from utils_examples import generate_synthetic_measure
 
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
-path = path + "/paper/"
+path = path + "sinkcv/"
 if not os.path.isdir(path):
     os.mkdir(path)
 
-rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True}
+rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True,
+      'text.latex.preamble': [r'\usepackage{amsmath}',
+                              r'\usepackage{amssymb}']}
 plt.rcParams.update(rc)
 
-
-def gauss(grid, mu, sig):
-    return np.exp(-0.5 * ((grid-mu) / sig) ** 2)
-
-
-def normalize(x):
-    return x / np.sum(x)
-
-
-def generate_measure(N):
-    x = np.linspace(0.2, 0.4, num=N)
-    a = np.zeros_like(x)
-    a[:N//2] = 2.
-    a[N//2:] = 3.
-    y = np.linspace(0.45, 0.95, num=N)
-    a = normalize(a)
-    b = normalize(gauss(y, 0.6, 0.03)
-                  + gauss(y, 0.7, 0.03)
-                  + gauss(y, 0.8, 0.03))
-    return a, x, b, y
-
-
+# TODO: Rewrite code + make xp possible with WOT data
 if __name__ == '__main__':
-    N = 200
-    a, x, b, y = generate_measure(N)
+    compute_data = False
+
+    N = 100
+    a, x, b, y = generate_synthetic_measure(N, N)
     C = (x[:, None] - y[None, :]) ** 2
-    eps, rho = 0.001, .1
-    Nits_inf, Nits = 5000, 500
+    eps_r, rho_r = 0.001, 1.
+    func_method = [f_sinkhorn_loop, h_sinkhorn_loop]
+    dataname = 'synthetic'
+    string_method = ['f', 'h']
+    penalty = 'kl'
+    t = 1e-2
+    scale_l = [1e-0, 1e-2]
 
-    scale = [10., 1., 0.1]
-    scale = [0.1, 0.2, 0.5]
-    col = ['b', 'r', 'g', 'm']
-    lw = 2.
-    plt.figure(figsize=(8, 5))
-    for p in range(len(scale)):
-        epst, rhot = scale[p] * eps, scale[p] * rho
 
-        # Compute reference
-        # TODO: do more iterations and break if reach tol=1e-15
-        fr, gr = np.zeros_like(a), np.zeros_like(b)
-        for i in range(Nits_inf):
-            fr, gr = homogeneous_loop(fr, a, b, C, epst, rhot)
+    if compute_data:
+        for t in scale_l:
+            eps, rho = t * eps_r, t * rho_r
 
-        # compute norm for sinkhorn
-        f, g = np.zeros_like(a), np.zeros_like(b)
-        err_sink = []
-        for i in range(Nits):
-            f, g = sinkhorn_loop(f, a, b, C, epst, rhot)
-            err_sink.append(np.amax(np.abs(f - fr)))
-            # err_sink.append(hilbert_norm(f - fr))
-        plt.plot(np.log10(np.array(err_sink)), color=col[p],
-                 linestyle='dashed',
-                 label=f'$S,\,t=${scale[p]}', linewidth=lw)
+            # Compute fixed point
+            fr, gr = np.zeros_like(a), np.zeros_like(b)
+            for i in range(20000):
+                f_tmp = fr.copy()
+                fr, gr = h_sinkhorn_loop(fr, a, b, C, eps, rho)
+                fr, gr = f_sinkhorn_loop(fr, a, b, C, eps, rho)
+                if np.amax(np.abs(fr - f_tmp)) < 1e-15:
+                    break
+            print("     Estimated fixed point.")
 
-        # compute norm for sinkhorn
-        f, g = np.zeros_like(a), np.zeros_like(b)
-        err_hom = []
-        for i in range(Nits):
-            f, g = invariant_loop(f, a, b, C, epst, rhot)
-            # t = rescale_berg(f, g, a, b, rhot)
-            err_hom.append(np.amax(np.abs(f - fr)))
-            # err_hom.append(hilbert_norm(f - fr))
-        plt.plot(np.log10(np.array(err_hom)), color=col[p],
-                 label=f'$TI,\,t=${scale[p]}', linewidth=lw)
+            # Compute error
+            for k, (s, loop) in enumerate(zip(string_method, func_method)):
+                err = []
+                f, g = np.zeros_like(a), np.zeros_like(b)
+                for i in range(2000):
+                    f_tmp = f.copy()
+                    f, g = loop(f, a, b, C, eps, rho)
 
-    plt.xlabel('$Iterations$', fontsize=20)
-    plt.ylabel('$\log_{10}\|f_t - f^*\|_\infty$', fontsize=20)
-    plt.legend(fontsize=12)
+                    err.append(np.amax(np.abs(f - fr)))
+                    if np.amax(np.abs(f - fr)) < 1e-12:
+                        break
+                np.save(
+                    path + "error_" + s + f"_sinkhorn_{penalty}_eps{eps}_{dataname}.npy",
+                    np.array(err))
+
+    ###########################################################################
+    # Make plots
+    ###########################################################################
+    p = 0.9
+    colors = ['cornflowerblue', 'indianred']
+    markers = ['v', 'o']
+    linestyles = ['dashed', 'dotted']
+    # labels = ['$\mathcal{F},\,t=$', '$\mathcal{H},\,t=$']
+    labels = ['S, t=', 'TI, t=']
+    markevery = 150
+    f, ax = plt.subplots(1, 1, figsize=(p * 6, p * 4))
+
+    for t, linestyle, marker in zip(scale_l, linestyles, markers):
+        eps, rho = t * eps_r, t * rho_r
+        for s, label, color in zip(string_method, labels, colors):
+            err = np.load(
+                path + f"error_" + s + f"_sinkhorn_{penalty}_eps{eps}_{dataname}.npy")
+            ax.plot(err, c=color, linestyle=linestyle,
+                    label=label + f'{t}',
+                    marker=marker, markevery=markevery)
+
+        ax.legend(fontsize=11, ncol=2, columnspacing=0.5, handlelength=2.)
+
+    ax.grid()
+    ax.set_yscale('log')
+    # ax.set_ylim([1e-6, 1.5])
+    ax.set_xlabel('Number of Iterations', fontsize=18)
+    if penalty == 'kl':
+        ax.set_title('KL entropy', fontsize=22)
+    if penalty == 'berg':
+        ax.set_title('Berg entropy', fontsize=22)
+    ax.set_ylabel('$|| f_t - f^\star||_{\infty}$', fontsize=18)
+
     plt.tight_layout()
-    plt.savefig(path + 'plot_sinkhorn_ratio_fixed.pdf')
+    plt.savefig(
+        path + f'plot_cv_error_{penalty}_{dataname}.pdf')
     plt.show()

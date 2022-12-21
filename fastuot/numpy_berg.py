@@ -23,16 +23,16 @@ def log_lambertw(x):
     z = init_lambertw(x)
 
     def a(w):
-        return (w * (np.log(w + 1e-14) + w - x)) / (1 + w)
+        return (w * (np.log(w + 1e-17) + w - x)) / (1 + w)
 
     def b(w):
         return -1 / (w * (1 + w))
 
-    for i in range(4):
+    for i in range(5):
         c = a(z)
         z = np.maximum(
             z - c / (1 - 0.5 * c * b(z)),
-            1e-14,
+            1e-17,
         )
     return z
 
@@ -87,10 +87,10 @@ def hess_invariant(t, f, g, a, b, rho, rho2):
            - np.sum(b * hess_phis_berg(-g + t, rho2))
 
 
-def rescale_berg(f, g, a, b, rho, rho2=None, nits=5):
+def rescale_berg(f, g, a, b, rho, rho2=None, nits=10, init=0.):
     if rho2 is None:
         rho2 = rho
-    t = 0.0
+    t = init
     for k in range(nits):
         grad = grad_invariant(t, f, g, a, b, rho, rho2)
         hess = hess_invariant(t, f, g, a, b, rho, rho2)
@@ -122,7 +122,7 @@ def f_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
 # H-Sinkhorn
 ###############################################################################
 
-def h_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None, nits=4):
+def h_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None, nits=20):
     if rho2 is None:
         rho2 = rho
     t = 0
@@ -130,14 +130,14 @@ def h_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None, nits=4):
     gs = sinkx(C, f, a, eps)
     for it in range(nits):
         g = -aprox_berg(-(gs - t), eps, rho2) + t
-        t = rescale_berg(f, g, a, b, rho, rho2, nits=nits)
+        t = rescale_berg(f, g, a, b, rho, rho2, nits=nits, init=t)
     g = -aprox_berg(-(gs - t), eps, rho2) + t
 
     # Update on F
     fs = sinky(C, g, b, eps)
     for it in range(nits):
         f = -aprox_berg(-(fs + t), eps, rho) - t
-        t = rescale_berg(f, g, a, b, rho, rho2, nits=nits)
+        t = rescale_berg(f, g, a, b, rho, rho2, nits=nits, init=t)
     f = -aprox_berg(-(fs + t), eps, rho) - t
 
     # Update on lambda

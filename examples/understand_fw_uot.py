@@ -18,7 +18,7 @@ if not os.path.isdir(path):
 #     for f in path:
 #         os.remove(f)
 
-
+# TODO: Replace these implementations with pointers to cvxpy_uot.py
 def solver_via_cvxpy(a, b, x, y, p, rho):
     C = np.abs(x[:, None] - y[None, :]) ** p
     P = cp.Variable((x.shape[0], y.shape[0]))
