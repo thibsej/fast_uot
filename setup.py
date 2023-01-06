@@ -12,7 +12,6 @@ setup(
     install_requires=[
               'numpy',
               'torch',
-              'cvxpy',
               'scipy',
               'numba',
               'matplotlib',

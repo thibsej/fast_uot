@@ -52,7 +52,7 @@ def f_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
     f = aprox(f, eps, rho)
     return f, g
 
-
+# TODO: implement g-sinkhorn
 def h_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
     if rho2 is None:
         g = aprox(sinkx(C, f, a, eps), eps, rho) \
