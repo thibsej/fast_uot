@@ -16,7 +16,7 @@ path = path + "cvrate/"
 if not os.path.isdir(path):
     os.mkdir(path)
 
-rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True,
+rc = {"pdf.fonttype": 42, 'text.usetex': True,
       'text.latex.preamble': [r'\usepackage{amsmath}',
                               r'\usepackage{amssymb}']}
 plt.rcParams.update(rc)
@@ -89,8 +89,8 @@ def load_wot_data():
 
 
 if __name__ == '__main__':
-    compute_data = False # If false then load precomputed results and plots
-    wot_data = True # If true uses the WOT package biological data
+    compute_data = True # If false then load precomputed results and plots
+    wot_data = False # If true uses the WOT package biological data
     
     marginal_penalty_l = ['kl', 'berg']
     penalty = marginal_penalty_l[0]
@@ -122,8 +122,8 @@ if __name__ == '__main__':
     ###########################################################################
     if compute_data:
         np.save(path + f"rho_scale.npy", rho_scale)
-        for r in range(len(eps_l)):
-            epst = 10 ** eps_l[r]
+        for k, r in enumerate(eps_l):
+            epst = 10 ** r
             rate = [[], [], []]
             for s in rho_scale:
                 rhot = 10 ** s

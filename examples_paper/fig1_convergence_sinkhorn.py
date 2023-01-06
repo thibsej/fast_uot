@@ -1,27 +1,26 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
-import os
 
-from fastuot.numpy_sinkhorn import f_sinkhorn_loop, h_sinkhorn_loop
-from fastuot.uot1d import logsumexp
-from fastuot.uot1d import hilbert_norm, rescale_potentials
 from utils_examples import generate_synthetic_measure
 
+from fastuot.numpy_sinkhorn import f_sinkhorn_loop, h_sinkhorn_loop
+
 path = os.getcwd() + "/output/"
+print(path)
 if not os.path.isdir(path):
     os.mkdir(path)
 path = path + "sinkcv/"
 if not os.path.isdir(path):
     os.mkdir(path)
 
-rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True,
+rc = {"pdf.fonttype": 42, 'text.usetex': True,
       'text.latex.preamble': [r'\usepackage{amsmath}',
                               r'\usepackage{amssymb}']}
 plt.rcParams.update(rc)
 
-# TODO: Rewrite code + make xp possible with WOT data
 if __name__ == '__main__':
-    compute_data = False
+    compute_data = True
 
     N = 100
     a, x, b, y = generate_synthetic_measure(N, N)
