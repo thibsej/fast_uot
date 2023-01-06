@@ -1,7 +1,7 @@
 import numpy as np
 import numba
 from numba import jit
-import progressbar
+from tqdm import tqdm
 
 # Numba issues a deprecation warning for lists...
 from numba.core.errors import NumbaDeprecationWarning, \
@@ -144,7 +144,7 @@ def solve_balanced_barycenter(a, x, lam):
     return I, P, y, f, cost
 
 
-def solve_unbalanced_barycenter(a, x, lam, rho, niter=100, verb=True):
+def solve_unbalanced_barycenter(a, x, lam, rho, niter=100):
     """Compute unbalanced OT barycenter using Frank-Wolfe's algorithm.
 
     Parameters
@@ -155,8 +155,6 @@ def solve_unbalanced_barycenter(a, x, lam, rho, niter=100, verb=True):
     rho: unbalanced parameter (increasing it to make the problem more balanced)
 
     niter: number of FW iterations.
-
-    verb: set to False to avoid displaying the progressbar.
 
 
     Returns
@@ -176,11 +174,8 @@ def solve_unbalanced_barycenter(a, x, lam, rho, niter=100, verb=True):
         f.append(np.zeros(n[k]))
         a1.append(np.zeros(n[k]))
     # F-W iterations
-    R = range(niter)
-    if verb:
-        R = progressbar.progressbar(R)
     cost = []
-    for it in R:
+    for it in tqdm(range(niter)):
         # optimal translation
         A, c = np.zeros(K), np.zeros(K)
         for k in range(K):

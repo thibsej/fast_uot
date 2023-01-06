@@ -15,7 +15,7 @@ setup(
               'scipy',
               'numba',
               'matplotlib',
-              'progressbar'
+              'tqdm'
           ],
     license="MIT",
 )

@@ -14,7 +14,7 @@ if not os.path.isdir(path + "/paper/"):
 if not os.path.isdir(path + "/uot_barycenter/"):
     os.mkdir(path + "/uot_barycenter/")
 
-rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True,
+rc = {"pdf.fonttype": 42, 'text.usetex': True,
       'text.latex.preamble': [r'\usepackage{amsmath}', r'\usepackage{amssymb}']}
 plt.rcParams.update(rc)
 
@@ -48,7 +48,7 @@ def generate_mixtures(K, nsampl, sig):
 
 
 if __name__ == '__main__':
-    compute_data = False
+    compute_data = True
 
     m = 1000  # size of the grid
     grid_pw = np.linspace(0, 1, m)
@@ -76,8 +76,7 @@ if __name__ == '__main__':
 
         # Compute unbalanced barycenter
         Iu, Pu, yu, fu, cost = solve_unbalanced_barycenter(a, x, lam, rho,
-                                                           niter=niter_uot_fw,
-                                                           verb=True)
+                                                           niter=niter_uot_fw)
         np.save(path + "/uot_barycenter/" + f"support_unbalanced_bar.npy", yu)
         np.save(path + "/uot_barycenter/" + f"weights_unbalanced_bar.npy", Pu)
         np.save(path + "/uot_barycenter/" + f"score_unbalanced_bar.npy",
