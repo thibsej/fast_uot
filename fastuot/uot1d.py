@@ -4,6 +4,7 @@ from numba import jit
 import scipy as sp  # for sparse matrices
 import scipy.sparse.linalg as sln
 from scipy.sparse import csr_matrix
+from tqdm import tqdm
 
 
 @jit(nopython=True)
@@ -156,7 +157,7 @@ def primal_dual_gap(a, b, x, y, p, f, g, P, I, J, rho1, rho2=None):
 
 
 def solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-10,
-              greed_init=True, line_search='default', stable_lse=True):
+              greed_init=False, line_search='default', stable_lse=True):
     assert line_search in ['homogeneous', 'newton', 'default']
     if rho2 is None:
         rho2 = rho1
@@ -167,7 +168,7 @@ def solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-10,
     else:
         f, g = np.zeros_like(a), np.zeros_like(b)
 
-    for k in range(niter):
+    for k in tqdm(range(niter)):
         # Output FW descent direction
         transl = rescale_potentials(f, g, a, b, rho1, rho2,
                                     stable_lse=stable_lse)
@@ -216,7 +217,7 @@ def pairwise_solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-10,
     atoms = [[f, g]]
     weights = [1.]
 
-    for k in range(niter):
+    for k in tqdm(range(niter)):
         transl = rescale_potentials(f, g, a, b, rho1, rho2)
         f, g = f + transl, g - transl
         A = np.exp(-f / rho1) * a
@@ -347,6 +348,7 @@ def newton_line_search(fin, gin, d_f, d_g, a, b, rho1, rho2, nits, tmax=1.):
 ###############################################################################
 
 def init_greed_uot(a, b, x, y, p, rho1, rho2=None):
+    # TODO: this method seems to loop forever and bugs
     if rho2 is None:
         rho2 = rho1
 

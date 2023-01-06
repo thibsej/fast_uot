@@ -23,14 +23,14 @@ plt.rcParams.update(rc)
 if __name__ == '__main__':
     compute_data = True
     np.random.seed(6)
-    n, m = 50, 51
+    n, m = 5000, 5001
     a, x, b, y = generate_random_measure(n, m)
 
     # params
     p = 1.5
     rho = .1
-    niter = 10
-    niter_ref = 50
+    niter = 10000
+    niter_ref = 200000
 
     ###########################################################################
     # Generate data plots

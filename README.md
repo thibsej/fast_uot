@@ -13,11 +13,12 @@ The computation of unbalanced optimal transport is available with NumPy and PyTo
 * scipy
 * numba
 * matplotlib
-* progressbar
+* tqdm
 
 
 ## Install the package
 First install the required packages using pip or conda. Then clone the package at the location of your choice. In the folder '../fast_uot' do:
+
         $ python setup.py install
 
 
