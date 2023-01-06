@@ -13,7 +13,7 @@ path = path + "/paper/"
 if not os.path.isdir(path):
     os.mkdir(path)
 
-rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True,
+rc = {"pdf.fonttype": 42, 'text.usetex': True,
       'text.latex.preamble': [r'\usepackage{amsmath}', r'\usepackage{amssymb}']}
 plt.rcParams.update(rc)
 

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from fastuot.uot1d import solve_ot, rescale_potentials, invariant_dual_loss, \
     homogeneous_line_search, solve_uot
-from utils_examples import normalize
+from utils_examples import generate_random_measure
 
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
@@ -16,39 +16,34 @@ if not os.path.isdir(path):
     os.mkdir(path)
 
 
-rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True}
+rc = {"pdf.fonttype": 42, 'text.usetex': True}
 plt.rcParams.update(rc)
 
-
-def generate_random_measure(n, m):
-    a = normalize(np.random.uniform(size=n))
-    b = normalize(np.random.uniform(size=m))
-    x = np.sort(np.random.uniform(size=n))
-    y = np.sort(np.random.uniform(size=m))
-    return a, x, b, y
-
-
+# TODO: Debug uot1d which seems not to work
 if __name__ == '__main__':
-    compute_data = False
+    compute_data = True
     np.random.seed(6)
-    n, m = 5000, 5001
+    n, m = 50, 51
     a, x, b, y = generate_random_measure(n, m)
 
     # params
     p = 1.5
     rho = .1
-    niter = 10000
+    niter = 10
+    niter_ref = 50
 
     ###########################################################################
     # Generate data plots
     ###########################################################################
     if compute_data:
-        _, _, _, fr, _, _ = solve_uot(a, b, x, y, p, rho, niter=200000)
+        print('Computing optimal reference potential...')
+        _, _, _, fr, _, _ = solve_uot(a, b, x, y, p, rho, niter=niter_ref)
         np.save(path + "ref_pot_maxiter.npy", fr)
 
         #######################################################################
         # Vanilla FW
         #######################################################################
+        print('Computation of error for Vanilla FW')
         f, g = np.zeros_like(a), np.zeros_like(b)
         transl = rescale_potentials(f, g, a, b, rho, rho)
         f, g = f + transl, g - transl
@@ -76,6 +71,7 @@ if __name__ == '__main__':
         #######################################################################
         # Vanilla FW with homogeneous line search
         #######################################################################
+        print('Computation of error for FW with line-search')
         f, g = np.zeros_like(a), np.zeros_like(b)
         transl = rescale_potentials(f, g, a, b, rho, rho)
         f, g = f + transl, g - transl
@@ -105,6 +101,7 @@ if __name__ == '__main__':
         #######################################################################
         # Pairwise FW
         #######################################################################
+        print('Computation of error for Pairwise FW')
         f, g = np.zeros_like(a), np.zeros_like(b)
         transl = rescale_potentials(f, g, a, b, rho, rho)
         f, g = f + transl, g - transl
@@ -123,8 +120,8 @@ if __name__ == '__main__':
             # Find best ascent direction
             score = np.inf
             itop = 0
-            for i in range(len(atoms)):
-                [ft, gt] = atoms[i]
+            for i, [ft, gt] in enumerate(atoms):
+                # [ft, gt] = atoms[i]
                 dscore = np.sum(A * ft) + np.sum(B * gt)
                 if dscore < score:
                     itop = i
@@ -133,8 +130,8 @@ if __name__ == '__main__':
 
             # Check existence of atom in dictionary
             jtop = -1
-            for i in range(len(atoms)):
-                [ft, gt] = atoms[i]
+            for i, [ft, gt] in enumerate(atoms):
+                # [ft, gt] = atoms[i]
                 if np.array_equal(ft, fs) and np.array_equal(gt, gs):
                     jtop = i
                     break

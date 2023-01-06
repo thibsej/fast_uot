@@ -19,3 +19,11 @@ def generate_synthetic_measure(n, m):
                   + gauss(y, 0.7, 0.03)
                   + gauss(y, 0.8, 0.03))
     return a, x, b, y
+
+
+def generate_random_measure(n, m):
+    a = normalize(np.random.uniform(size=n))
+    b = normalize(np.random.uniform(size=m))
+    x = np.sort(np.random.uniform(size=n))
+    y = np.sort(np.random.uniform(size=m))
+    return a, x, b, y
