@@ -9,7 +9,7 @@ from fastuot.torch_sinkhorn import h_sinkhorn_loop
 from fastuot.torch_sinkhorn import rescale_potentials as translate_pot
 from utils_examples import generate_synthetic_measure
 
-rc = {"pdf.fonttype": 42, 'text.usetex': True, 'text.latex.preview': True,
+rc = {"pdf.fonttype": 42, 'text.usetex': True,
       'text.latex.preamble': [r'\usepackage{amsmath}', r'\usepackage{amssymb}']}
 plt.rcParams.update(rc)
 
@@ -18,7 +18,7 @@ assert torch.cuda.is_available()
 path = os.getcwd() + "/output/"
 if not os.path.isdir(path):
     os.mkdir(path)
-path = path + 'benchfwsink/'
+path = path + 'bench_fw_sink/'
 if not os.path.isdir(path):
     os.mkdir(path)
 
@@ -82,8 +82,8 @@ if __name__ == '__main__':
         Ct = torch.from_numpy(C).cuda()
         frt = torch.from_numpy(fr).cuda()
         # Runover values of entropic regularization
-        for j in range(len(list_eps)):
-            eps = 10 ** list_eps[j]
+        for k, logeps in enumerate(list_eps):
+            eps = 10 ** logeps
             ft, gt = torch.zeros_like(at), torch.zeros_like(bt)
             time_sink, acc_sink = [], []
             for k in range(nits):
@@ -92,9 +92,9 @@ if __name__ == '__main__':
                 time_sink.append(time.time() - t0)
                 transl = translate_pot(ft, gt, at, bt, rho, rho)
                 acc_sink.append((ft + transl - frt).abs().max().data.item())
-            np.save(path + f"time_sink_eps{list_eps[j]}.npy",
+            np.save(path + f"time_sink_eps{logeps}.npy",
                     np.array(time_sink))
-            np.save(path + f"err_sink_eps{list_eps[j]}.npy",
+            np.save(path + f"err_sink_eps{logeps}.npy",
                     np.array(acc_sink))
 
     ###########################################################################
@@ -103,24 +103,24 @@ if __name__ == '__main__':
     # Compute median time of loop for rescaling x-axis
     list_time = []
     list_time.append(np.median(np.load(path + f"time_fw.npy")))
-    for j in range(len(list_eps)):
+    for k, logeps in enumerate(list_eps):
         list_time.append(np.median(
-            np.load(path + f"time_sink_eps{list_eps[j]}.npy")))
+            np.load(path + f"time_sink_eps{logeps}.npy")))
 
     # Aggregating all convergence accuracies and plotting
     list_acc = []
     list_acc.append(np.load(path + f"err_fw.npy"))
-    for j in range(len(list_eps)):
+    for k, logeps in enumerate(list_eps):
         list_acc.append(
-            np.load(path + f"err_sink_eps{list_eps[j]}.npy"))
+            np.load(path + f"err_sink_eps{logeps}.npy"))
 
     colors = ['cornflowerblue', 'lightcoral', 'indianred', 'firebrick']
     labels = ['FW'] \
              + [r'TI, $\log\varepsilon$='+str(x) for x in list_eps]
 
     plt.figure(figsize=(4, 2.5))
-    for k in range(len(list_time)):
-        plt.plot(list_time[k] * np.arange(1, nits + 1), list_acc[k], c=colors[k],
+    for k, t in enumerate(list_time):
+        plt.plot(t * np.arange(1, nits + 1), list_acc[k], c=colors[k],
                   label=labels[k])
 
     plt.xlabel('Time', fontsize=15)
