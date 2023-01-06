@@ -10,7 +10,13 @@ setup(
     url='https://github.com/thibsej/fast_uot',
     packages=['fastuot'],
     install_requires=[
-              'numpy'
+              'numpy',
+              'torch',
+              'cvxpy',
+              'scipy',
+              'numba',
+              'matplotlib',
+              'progressbar'
           ],
     license="MIT",
 )
