@@ -229,8 +229,7 @@ def pairwise_solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-10,
         # Find best ascent direction
         score = np.inf
         itop = 0
-        for i in range(len(atoms)):
-            [ft, gt] = atoms[i]
+        for i, [ft, gt] in enumerate(atoms):
             dscore = np.sum(A * ft) + np.sum(B * gt)
             if dscore < score:
                 itop = i
@@ -239,8 +238,7 @@ def pairwise_solve_uot(a, b, x, y, p, rho1, rho2=None, niter=100, tol=1e-10,
 
         # Check existence of atom in dictionary
         jtop = -1
-        for i in range(len(atoms)):
-            [ft, gt] = atoms[i]
+        for i, [ft, gt] in enumerate(atoms):
             if np.array_equal(ft, fd) and np.array_equal(gt, gd):
                 jtop = i
                 break
@@ -348,7 +346,6 @@ def newton_line_search(fin, gin, d_f, d_g, a, b, rho1, rho2, nits, tmax=1.):
 ###############################################################################
 
 def init_greed_uot(a, b, x, y, p, rho1, rho2=None):
-    # TODO: this method seems to loop forever and bugs
     if rho2 is None:
         rho2 = rho1
 
@@ -414,7 +411,8 @@ def lazy_potential(x, y, p, diagonal=True):
                 j += 1
                 f[i] = 0.5 * (c22 + c21 - c12 + f[i - 1] - g[j - 1])
                 g[j] = 0.5 * (c22 + c12 - c21 - f[i - 1] + g[j - 1])
-        elif c12 > c21:
+                continue
+        if c12 > c21:
             i += 1
             f[i] = c21 - g[j]
         elif c12 < c21:

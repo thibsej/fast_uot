@@ -58,6 +58,7 @@ def f_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
 
 
 def g_sinkhorn_loop(f, a, b, C, eps, rho, rho2=None):
+    # TODO: Wrong version of g-sinkhorn
     if rho2 is None:
         rho2 = rho
     # Update on G
