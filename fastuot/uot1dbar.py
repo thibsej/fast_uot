@@ -1,5 +1,4 @@
 import numpy as np
-import numba
 from numba import jit
 from tqdm import tqdm
 
@@ -8,20 +7,22 @@ from numba.core.errors import NumbaDeprecationWarning, \
     NumbaPendingDeprecationWarning
 import warnings
 
-warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
-warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
+warnings.simplefilter("ignore", category=NumbaDeprecationWarning)
+warnings.simplefilter("ignore", category=NumbaPendingDeprecationWarning)
 
 
 @jit(nopython=True)
 def solve_balanced_barycenter(a, x, lam):
-    """Computes the 1D Optimal Transport barycenters between several histograms.
+    """Computes the 1D Optimal Transport barycenters between several
+    histograms.
 
-    _Important:  np.sum(a[k]) should be the same for all k (balanced OT problems)._
+    _Important:  np.sum(a[k]) should be the same for all k
+    (balanced OT problems)._
 
     Solve the problem
         min_beta sum_k lam[k] * OT( alpha_k, beta )
-    where OT is the 1D optimal transport distance for the squared Euclidean constant
-    |x-y|^2, alpha_k is the k^th input measure
+    where OT is the 1D optimal transport distance for the squared Euclidean
+    distance |x-y|^2, alpha_k is the k^th input measure
     (with positions x[k] and weights a[k], see below). The solution beta has
     weights P and positions y (see below).
 
@@ -30,9 +31,9 @@ def solve_balanced_barycenter(a, x, lam):
 
     This is computed by solving a multi-marginal problem, and it also output
     the dual variable solution of
-        sum_k lam[k] * <a[k],f[k]>  s.t.  sum_k f[k][ik] <= C[i1,\ldots,iK]
+        sum_k lam[k] * <a[k],f[k]>  s.t.  sum_k f[k][ik] <= C[i1,...,iK]
     where C is the multi-marginal cost
-        C[i1,\ldots,iK] = sum_k lam[k] |x[k][ik] - bar|^2
+        C[i1,...,iK] = sum_k lam[k] |x[k][ik] - bar|^2
     where
         bar = sum_k lam[k] * x[k][ik]
 
@@ -40,15 +41,15 @@ def solve_balanced_barycenter(a, x, lam):
     ----------
     a: list of K vectors, a[k] is the histogram #k
 
-    x: list of K vectors, x[k] are the positions of the histogram #k, it *must* be increasing
-        and have same length as a[k]
+    x: list of K vectors, x[k] are the positions of the histogram #k,
+    it *must* be increasing and have same length as a[k]
 
     lam: weights for the barycenters, should be positive and sum to 1,
         lam[k] is the weight for the k^th histogram.
 
     Returns
     ----------
-    I: matrix of size (m,K), each I[:,k] is a
+    idx: matrix of size (m,K), each I[:,k] is a
         vector of length m of increasing integer in range(len(n[p])
 
     P: vector of length m, weights of the barycenter.
@@ -74,7 +75,7 @@ def solve_balanced_barycenter(a, x, lam):
     f = []
     for k in range(K):
         f.append(np.zeros(n[k]))
-    I = np.zeros((m, K), dtype=np.int32)
+    idx = np.zeros((m, K), dtype=np.int32)
 
     # evaluate the multi-marginal cost
     def eval_cost(L):
@@ -99,19 +100,19 @@ def solve_balanced_barycenter(a, x, lam):
     for j in range(m - 1):
         # find which input k0 to flush, take the one with minimum mass
         for k in range(K):
-            h[k] = a1[k][I[j, k]]
-            if I[j, k] == n[k] - 1:  # boundary reached, should not select this
+            h[k] = a1[k][idx[j, k]]
+            if idx[j, k] == n[k] - 1:  # boundary reached
                 h[k] = 1e6
         k0 = np.argmin(h)
-        i0 = I[j, k0]
+        i0 = idx[j, k0]
         # nobody moves excepted k0
         for k in range(K):
-            i = I[j, k]
+            i = idx[j, k]
             a1[k][i] = a1[k][i] - h[k0]
-            if (k == k0):
-                I[j + 1, k] = i + 1
+            if k == k0:
+                idx[j + 1, k] = i + 1
             else:
-                I[j + 1, k] = i
+                idx[j + 1, k] = i
         P[j] = h[k0]  # transported mass
 
         # update dual potentials
@@ -119,7 +120,7 @@ def solve_balanced_barycenter(a, x, lam):
         ff = 0
         for k in range(K):
             if k != k0:
-                i = I[j, k]
+                i = idx[j, k]
                 L[k] = i
                 ff = ff + f[k][i]
             else:
@@ -133,7 +134,7 @@ def solve_balanced_barycenter(a, x, lam):
     y = np.zeros(m)
     for j in range(m):
         for k in range(K):
-            i = I[j, k]
+            i = idx[j, k]
             y[j] = y[j] + lam[k] * x[k][i]
 
     # dual cost sum_k lam[k]*<ak,fk>
@@ -141,7 +142,7 @@ def solve_balanced_barycenter(a, x, lam):
     for k in range(K):
         cost = cost + lam[k] * np.sum(a[k] * f[k])
 
-    return I, P, y, f, cost
+    return idx, P, y, f, cost
 
 
 def solve_unbalanced_barycenter(a, x, lam, rho, niter=100):
@@ -194,9 +195,9 @@ def solve_unbalanced_barycenter(a, x, lam, rho, niter=100):
         for k in range(K):
             f[k] = (1 - gamma) * f[k] + gamma * fs[k]
         # Evaluate cost
-        c, summass = 1., 0.
+        c, summass = 1.0, 0.0
         for k in range(K):
-            c = c * np.sum(a[k] * np.exp(-f[k] / rho))**(1 / K)
+            c = c * np.sum(a[k] * np.exp(-f[k] / rho)) ** (1 / K)
             summass = summass + rho * np.sum(a[k])
-        cost.append(summass-c)
+        cost.append(summass - c)
     return I, P, y, f, cost
